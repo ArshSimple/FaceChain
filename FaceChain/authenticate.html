@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FaceChain - Authenticate</title>
+  <style>
+    body { font-family: 'Inter', sans-serif; background: #101a23; color: white; margin: 0; }
+    header { display: flex; justify-content: space-between; align-items: center; padding: 10px 40px; border-bottom: 1px solid #223649; }
+    header h2 { font-size: 1.25rem; font-weight: bold; }
+    nav a { margin-left: 20px; text-decoration: none; color: white; font-weight: 500; }
+    .btn { padding: 10px 20px; margin: 5px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+    .btn-start { background: #223649; color: white; }
+    .btn-stop { background: #223649; color: white; }
+    .btn-submit { background: #0b80ee; color: white; }
+    video { border-radius: 10px; margin: 10px 0; }
+    main { padding: 20px 40px; }
+  </style>
+</head>
+<body>
+  <!-- Header / Nav -->
+  <header>
+    <h2>FaceChain</h2>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="upload.html">Upload</a>
+      <a href="authenticate.html">Authenticate</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Real-time Facial Recognition Test</h1>
+    <video id="video" width="320" height="240" autoplay></video>
+    <div>
+      <button class="btn btn-start" id="startBtn">Start Camera</button>
+      <button class="btn btn-stop" id="stopBtn">Stop Camera</button>
+      <button class="btn btn-submit" id="submitBtn">Submit</button>
+    </div>
+    <p id="result">Recognition Result: -</p>
+    <p id="info">Relevant Information: -</p>
+  </main>
+
+  <script>
+    const video = document.getElementById('video');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    const resultText = document.getElementById('result');
+    const infoText = document.getElementById('info');
+
+    let stream = null;
+
+    // Start Camera
+    startBtn.onclick = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+      } catch (err) {
+        alert("Cannot access camera: " + err);
+      }
+    };
+
+    // Stop Camera
+    stopBtn.onclick = () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+        video.srcObject = null;
+      }
+    };
+
+    // Submit / Authenticate
+    submitBtn.onclick = async () => {
+      if (!stream) { alert("Start the camera first!"); return; }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 320;
+      canvas.height = video.videoHeight || 240;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const image = canvas.toDataURL('image/png');
+
+      try {
+        const res = await fetch('http://127.0.0.1:5000/authenticate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image })
+        });
+
+        if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+        const data = await res.json();
+
+        if (data.match) {
+          resultText.innerText = "Recognition Result: ✅ Match Found!";
+          infoText.innerText = `Relevant Information: User ID: ${data.user_id}`;
+        } else {
+          resultText.innerText = "Recognition Result: ❌ Not Found!";
+          infoText.innerText = "Relevant Information: N/A";
+        }
+      } catch (err) {
+        resultText.innerText = "Recognition Result: Error!";
+        infoText.innerText = err;
+      }
+    };
+  </script>
+</body>
+</html>
