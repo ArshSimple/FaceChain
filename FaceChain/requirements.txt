@@ -1,8 +1,0 @@
-flask
-flask-cors
-opencv-python
-numpy
-dlib
-pillow
-scipy
-gunicorn
