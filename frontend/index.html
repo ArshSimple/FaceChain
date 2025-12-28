@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?display=swap&family=Inter:wght@400;500;700;900&family=Noto+Sans:wght@400;500;700;900">
+    <title>FaceChain - Secure Identity</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+</head>
+<body class="bg-[#141a1f] min-h-screen flex flex-col text-white" style='font-family: Inter, "Noto Sans", sans-serif;'>
+    
+    <header class="flex items-center justify-between border-b border-[#2b3640] px-10 py-3 bg-[#141a1f] sticky top-0 z-50">
+        <div class="flex items-center gap-4">
+            <svg class="size-6 text-[#0b80ee]" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M39.475 21.6262C40.358 21.4363 40.6863 21.5589 40.7581 21.5934C40.7876 21.655 40.8547 21.857 40.8082 22.3336C40.7408 23.0255 40.4502 24.0046 39.8572 25.2301C38.6799 27.6631 36.5085 30.6631 33.5858 33.5858C30.6631 36.5085 27.6632 38.6799 25.2301 39.8572C24.0046 40.4502 23.0255 40.7407 22.3336 40.8082C21.8571 40.8547 21.6551 40.7875 21.5934 40.7581C21.5589 40.6863 21.4363 40.358 21.6262 39.475C21.8562 38.4054 22.4689 36.9657 23.5038 35.2817C24.7575 33.2417 26.5497 30.9744 28.7621 28.762C30.9744 26.5497 33.2417 24.7574 35.2817 23.5037C36.9657 22.4689 38.4054 21.8562 39.475 21.6262ZM4.41189 29.2403L18.7597 43.5881C19.8813 44.7097 21.4027 44.9179 22.7217 44.7893C24.0585 44.659 25.5148 44.1631 26.9723 43.4579C29.9052 42.0387 33.2618 39.5667 36.4142 36.4142C39.5667 33.2618 42.0387 29.9052 43.4579 26.9723C44.1631 25.5148 44.659 24.0585 44.7893 22.7217C44.9179 21.4027 44.7097 19.8813 43.5881 18.7597L29.2403 4.41187C27.8527 3.02428 25.8765 3.02573 24.2861 3.36776C22.6081 3.72863 20.7334 4.58419 18.8396 5.74801C16.4978 7.18716 13.9881 9.18353 11.5858 11.5858C9.18354 13.988 7.18717 16.4978 5.74802 18.8396C4.58421 20.7334 3.72865 22.6081 3.36778 24.2861C3.02574 25.8765 3.02429 27.8527 4.41189 29.2403Z" fill="currentColor"></path>
+            </svg>
+            <h2 class="text-xl font-bold tracking-tight">FaceChain</h2>
+        </div>
+        <nav class="flex gap-8">
+            <a class="text-sm font-semibold hover:text-[#0b80ee] transition-colors" href="index.html">Home</a>
+            <a class="text-sm font-semibold hover:text-[#0b80ee] transition-colors" href="upload.html">Upload</a>
+            <a class="text-sm font-semibold hover:text-[#0b80ee] transition-colors" href="authenticate.html">Authenticate</a>
+            <span id="adminNavLink" style="display: none;">
+                <a class="text-sm font-semibold text-[#e02424]" href="admin_dashboard.html">Admin Panel</a>
+            </span>
+        </nav>
+    </header>
+
+    <main class="flex-1 px-10 md:px-40 py-10 flex justify-center">
+        <div class="max-w-[1000px] flex flex-col gap-12">
+            
+            <section class="relative flex flex-col items-center justify-center p-8 gap-6 min-h-[480px] bg-slate-800 rounded-3xl overflow-hidden shadow-2xl border border-[#2b3640]">
+                <div class="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent z-10"></div>
+                <div class="z-20 text-center flex flex-col items-center gap-6">
+                    <h1 class="text-5xl font-black leading-tight">Secure Your Identity with <br><span class="text-[#0b80ee]">Blockchain Facial Auth</span></h1>
+                    <p class="text-lg text-gray-300 max-w-2xl">
+                        A decentralized authentication system ensuring your biometric data never leaves your control. High security meet seamless access.
+                    </p>
+                    <div class="flex gap-4 mt-4">
+                        <a href="authenticate.html" class="bg-[#0b80ee] px-8 py-3 rounded-xl font-bold hover:bg-[#0866c2] transition-all">Get Started</a>
+                        <a id="heroAdminBtn" href="admin_dashboard.html" class="bg-[#e02424] px-8 py-3 rounded-xl font-bold hidden border border-white/10">Access Dashboard</a>
+                    </div>
+                </div>
+            </section>
+
+            <section>
+                <div class="flex flex-col gap-2 mb-8">
+                    <h2 class="text-3xl font-bold">Why FaceChain?</h2>
+                    <p class="text-gray-400">Revolutionizing digital trust with biometric immutability.</p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <article class="bg-[#1c252d] p-6 rounded-2xl border border-[#2b3640] hover:border-[#0b80ee] transition-all group">
+                        <div class="size-12 bg-[#0b80ee]/10 text-[#0b80ee] rounded-lg flex items-center justify-center mb-4 text-2xl">🛡️</div>
+                        <h3 class="text-xl font-bold mb-2">Decentralized Storage</h3>
+                        <p class="text-sm text-[#9daebe] leading-relaxed">Identity hashes are stored on the blockchain, eliminating central server vulnerabilities and data breaches.</p>
+                    </article>
+
+                    <article class="bg-[#1c252d] p-6 rounded-2xl border border-[#2b3640] hover:border-[#0b80ee] transition-all">
+                        <div class="size-12 bg-[#0b80ee]/10 text-[#0b80ee] rounded-lg flex items-center justify-center mb-4 text-2xl">👤</div>
+                        <h3 class="text-xl font-bold mb-2">128D Biometric Vectors</h3>
+                        <p class="text-sm text-[#9daebe] leading-relaxed">Using Dlib's ResNet models to convert your face into a mathematical signature that's impossible to reverse-engineer.</p>
+                    </article>
+
+                    <article class="bg-[#1c252d] p-6 rounded-2xl border border-[#2b3640] hover:border-[#0b80ee] transition-all">
+                        <div class="size-12 bg-[#0b80ee]/10 text-[#0b80ee] rounded-lg flex items-center justify-center mb-4 text-2xl">⚡</div>
+                        <h3 class="text-xl font-bold mb-2">Zero-Trust Protocol</h3>
+                        <p class="text-sm text-[#9daebe] leading-relaxed">Authenticate locally with our Flask API. Your image data is never permanently stored, ensuring total privacy.</p>
+                    </article>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer class="px-5 py-12 text-center text-[#9daebe] border-t border-[#2b3640] bg-[#10161a]">
+        <div class="flex flex-wrap justify-center gap-10 mb-8">
+            <a href="#" class="hover:text-white transition-colors text-sm">Privacy Policy</a>
+            <a href="#" class="hover:text-white transition-colors text-sm">Security Audit</a>
+            <a href="#" class="hover:text-white transition-colors text-sm">Contact Support</a>
+        </div>
+        <p class="text-xs uppercase tracking-widest">© 2025 FaceChain Terminal. Powered by Web3 & Python.</p>
+    </footer>
+
+    <script>
+        // Check if user is already an admin on page load to update UI
+        async function checkSession() {
+            try {
+                // Fetch admin stats with credentials. 
+                // If it returns 200, we are logged in as admin.
+                const res = await fetch('http://127.0.0.1:5000/admin/stats', { 
+                    credentials: 'include' 
+                });
+                
+                if (res.ok) {
+                    document.getElementById('adminNavLink').style.display = 'inline';
+                    document.getElementById('heroAdminBtn').style.display = 'block';
+                }
+            } catch (err) {
+                console.log("No active admin session found.");
+            }
+        }
+
+        window.onload = checkSession;
+    </script>
+</body>
+</html>

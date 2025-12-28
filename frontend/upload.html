@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>FaceChain - Upload</title>
+<style>
+  body { font-family: 'Inter', sans-serif; background: #101a23; color: white; margin:0; }
+  header { display:flex; justify-content: space-between; align-items: center; padding: 10px 40px; border-bottom: 1px solid #223649; }
+  header h2 { font-size: 1.25rem; font-weight: bold; }
+  nav a { margin-left:20px; text-decoration:none; color:white; font-weight:500; }
+  .btn { padding:10px 20px; margin:5px; border:none; border-radius:8px; cursor:pointer; font-weight:bold; transition: 0.3s; }
+  .btn-start { background:#223649; color:white; }
+  .btn-stop { background:#223649; color:white; }
+  .btn-submit { background:#0b80ee; color:white; }
+  .btn-submit:hover { background: #0866c2; }
+  
+  video { border-radius:10px; margin:10px 0; transform: scaleX(-1); -webkit-transform: scaleX(-1); border: 2px solid #223649; }
+  input[type=file] { display:none; }
+  
+  .input-group { background: #1a2632; padding: 20px; border-radius: 10px; margin: 15px 0; border: 1px solid #223649; }
+  label { cursor:pointer; display:flex; flex-direction:column; align-items:center; gap:10px; border:2px dashed #314d68; border-radius:10px; padding:20px; margin:10px 0; }
+  
+  main { padding: 20px 40px; max-width: 800px; margin: auto; }
+  input[type=text] { padding:12px; border-radius:5px; border:1px solid #314d68; background: #101a23; color: white; margin-top: 8px; width: 100%; box-sizing: border-box; }
+  #message { margin-top: 20px; padding: 10px; border-radius: 5px; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<header>
+  <h2>FaceChain</h2>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="upload.html">Upload</a>
+    <a href="authenticate.html">Authenticate</a>
+  </nav>
+</header>
+
+<main>
+  <h1>Register Face Identity</h1>
+  <p style="color: #9daebe;">Link your facial biometrics to a User ID. <strong>Note:</strong> Use <em>ID 1</em> for Admin privileges.</p>
+
+  <div class="input-group">
+    <label style="border: none; padding: 0; align-items: flex-start;">
+      <strong>Enter User ID:</strong>
+      <input type="text" id="userIdInput" placeholder="e.g., 1 for Admin, 102 for Staff">
+    </label>
+  </div>
+
+  <div class="input-group">
+    <h3>Option 1: Live Capture</h3>
+    <video id="video" width="320" height="240" autoplay></video>
+    <div>
+      <button class="btn btn-start" id="startBtn">Start Camera</button>
+      <button class="btn btn-stop" id="stopBtn">Stop Camera</button>
+      <button class="btn btn-submit" id="captureBtn">Capture & Register</button>
+    </div>
+  </div>
+
+  <div class="input-group">
+    <h3>Option 2: Image Upload</h3>
+    <label id="dropZone">
+      <span>Drag & drop or click to select a file (JPG/PNG)</span>
+      <input type="file" id="fileInput" accept="image/*">
+    </label>
+    <button class="btn btn-submit" id="uploadBtn" style="width: 100%;">Upload & Register</button>
+  </div>
+
+  <div id="message"></div>
+</main>
+
+<script>
+const video = document.getElementById('video');
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
+const captureBtn = document.getElementById('captureBtn');
+const fileInput = document.getElementById('fileInput');
+const uploadBtn = document.getElementById('uploadBtn');
+const message = document.getElementById('message');
+const userIdInput = document.getElementById('userIdInput');
+let stream = null;
+
+// Start Camera
+startBtn.onclick = async () => {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video:true });
+    video.srcObject = stream;
+  } catch(err) {
+    alert("Cannot access camera: " + err);
+  }
+};
+
+// Stop Camera
+stopBtn.onclick = () => {
+  if(stream){
+    stream.getTracks().forEach(track => track.stop());
+    stream = null;
+    video.srcObject = null;
+  }
+};
+
+async function sendData(imageData, userId) {
+  message.innerText = "⏳ Processing registration...";
+  message.style.color = "white";
+
+  try {
+    // FIX: Added mode: 'cors' and targeted 127.0.0.1 specifically
+    const res = await fetch('http://127.0.0.1:5000/register', {
+      method: 'POST',
+      mode: 'cors', 
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: imageData, user_id: userId }),
+      credentials: 'include' 
+    });
+    
+    // Check Content-Type to avoid parsing HTML error pages as JSON
+    const contentType = res.headers.get("content-type");
+    if (contentType && contentType.indexOf("application/json") !== -1) {
+      const data = await res.json();
+      if (res.ok) {
+        message.innerText = "✅ Success: " + data.message;
+        message.style.color = "#059669";
+      } else {
+        message.innerText = "❌ Error: " + (data.error || "Registration failed");
+        message.style.color = "#e02424";
+      }
+    } else {
+        // If server returns 500 HTML error
+        message.innerText = "❌ Server Error (Not JSON). Check Flask Terminal.";
+        message.style.color = "#e02424";
+    }
+
+  } catch(err){
+    console.error(err);
+    message.innerText = "❌ Connection Error: Check if Flask app.py is running.";
+    message.style.color = "#e02424";
+  }
+}
+
+// Capture & Upload
+captureBtn.onclick = async () => {
+  const userId = userIdInput.value.trim();
+  if(!userId) { alert("Please enter a User ID first."); return; }
+  if(!stream) { alert("Please start the camera first."); return; }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth || 320;
+  canvas.height = video.videoHeight || 240;
+  const ctx = canvas.getContext('2d');
+  
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const image = canvas.toDataURL('image/png');
+  await sendData(image, userId);
+};
+
+// Upload from File
+uploadBtn.onclick = async () => {
+  const userId = userIdInput.value.trim();
+  if(!userId) { alert("Please enter a User ID first."); return; }
+  if(!fileInput.files[0]) { alert("Please select a file first."); return; }
+
+  const file = fileInput.files[0];
+  const reader = new FileReader();
+  reader.onloadend = async () => {
+    await sendData(reader.result, userId);
+  };
+  reader.readAsDataURL(file);
+};
+</script>
+
+</body>
+</html>

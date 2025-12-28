@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FaceChain - Authenticate</title>
+  <style>
+    body { font-family: 'Inter', sans-serif; background: #101a23; color: white; margin: 0; }
+    header { display: flex; justify-content: space-between; align-items: center; padding: 10px 40px; border-bottom: 1px solid #223649; }
+    header h2 { font-size: 1.25rem; font-weight: bold; }
+    nav a { margin-left: 20px; text-decoration: none; color: white; font-weight: 500; }
+    .btn { padding: 10px 20px; margin: 5px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+    .btn-start { background: #223649; color: white; }
+    .btn-stop { background: #223649; color: white; }
+    .btn-submit { background: #0b80ee; color: white; }
+    /* Style for the new Admin Panel button */
+    .btn-admin { background: #e02424; color: white; display: none; margin-top: 20px; } 
+    video { border-radius: 10px; margin: 10px 0; border: 2px solid #223649; transform: scaleX(-1); -webkit-transform: scaleX(-1);}
+    main { padding: 20px 40px; }
+    .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; background: #223649; margin-left: 10px; }
+  </style>
+</head>
+<body>
+  <header>
+    <h2>FaceChain <span id="roleBadge" class="status-badge">Guest Session</span></h2>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="upload.html">Upload</a>
+      <a href="authenticate.html">Authenticate</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Real-time Facial Recognition Test</h1>
+    <p>Position your face in the frame and click Submit to verify your identity and role.</p>
+    
+    <video id="video" width="320" height="240" autoplay></video>
+    
+    <div>
+      <button class="btn btn-start" id="startBtn">Start Camera</button>
+      <button class="btn btn-stop" id="stopBtn">Stop Camera</button>
+      <button class="btn btn-submit" id="submitBtn">Submit & Verify</button>
+    </div>
+
+    <div style="margin-top: 30px; padding: 20px; background: #1a2632; border-radius: 10px;">
+        <h3 id="result">Recognition Result: -</h3>
+        <p id="info">Relevant Information: -</p>
+        
+        <button class="btn btn-admin" id="adminPanelBtn" onclick="location.href='admin_dashboard.html'">
+            🔓 Open Admin Control Panel
+        </button>
+    </div>
+  </main>
+<script>
+    const video = document.getElementById('video');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    const resultText = document.getElementById('result');
+    const infoText = document.getElementById('info');
+    const roleBadge = document.getElementById('roleBadge');
+    const adminBtn = document.getElementById('adminPanelBtn');
+
+    let stream = null;
+
+    startBtn.onclick = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+      } catch (err) {
+        alert("Cannot access camera: " + err);
+      }
+    };
+
+    stopBtn.onclick = () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        stream = null;
+        video.srcObject = null;
+      }
+    };
+
+    submitBtn.onclick = async () => {
+      if (!stream) { alert("Start the camera first!"); return; }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 320;
+      canvas.height = video.videoHeight || 240;
+      const ctx = canvas.getContext('2d');
+      
+      // We do NOT flip the canvas because the backend expects 
+      // a standard image, even if the preview is mirrored.
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const image = canvas.toDataURL('image/png');
+
+      resultText.innerText = "Processing...";
+
+      try {
+        // FIXED: Added credentials: 'include' to store the session cookie
+        const res = await fetch('http://127.0.0.1:5000/authenticate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image }),
+          credentials: 'include' 
+        });
+
+        if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+        const data = await res.json();
+
+        if (data.match) {
+          resultText.innerText = `Recognition Result: ✅ Match Found!`;
+          infoText.innerText = `User ID: ${data.user_id} | Role: ${data.role.toUpperCase()}`;
+          roleBadge.innerText = `${data.role.toUpperCase()} Session`;
+          roleBadge.style.background = data.role === 'admin' ? '#e02424' : '#0b80ee';
+
+          // Show Admin button if the role is 'admin'
+          if (data.role === 'admin') {
+            adminBtn.style.display = 'block';
+          } else {
+            adminBtn.style.display = 'none';
+          }
+        } else {
+          resultText.innerText = "Recognition Result: ❌ Not Found!";
+          infoText.innerText = "Relevant Information: Access Denied";
+          roleBadge.innerText = "Guest Session";
+          roleBadge.style.background = "#223649";
+          adminBtn.style.display = 'none';
+        }
+      } catch (err) {
+        resultText.innerText = "Recognition Result: Error!";
+        infoText.innerText = err;
+      }
+    };
+</script>
+</body>
+</html>
