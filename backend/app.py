@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify, session, render_template
 from flask_cors import CORS
 from face_utils import extract_embedding
 import os, json, base64, cv2, numpy as np
@@ -10,18 +10,13 @@ app = Flask(__name__)
 app.secret_key = 'facechain_secret_key_123' 
 
 # ---------------------------------------------------------------------------
-# 1. THE "NUCLEAR" CORS FIX
-# 'origins=r".*"' tells Flask to accept requests from ANYWHERE (VS Code, 
-# local file, different ports) while still allowing cookies.
+# 1. CORS & SESSION CONFIG
 # ---------------------------------------------------------------------------
 CORS(app, supports_credentials=True, origins=r".*")
 
-# ---------------------------------------------------------------------------
-# 2. SESSION CONFIGURATION (Crucial for Localhost)
-# ---------------------------------------------------------------------------
 app.config.update(
-    SESSION_COOKIE_SAMESITE="Lax",  # "Lax" is required for http://localhost
-    SESSION_COOKIE_SECURE=False,    # Must be False because you don't have https
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=False,
     SESSION_COOKIE_HTTPONLY=True,
     PERMANENT_SESSION_LIFETIME=datetime.timedelta(days=1)
 )
@@ -32,7 +27,6 @@ AUTH_LOGS_FILE = 'auth_logs.json'
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Initialize logs file if missing
 if not os.path.exists(AUTH_LOGS_FILE):
     with open(AUTH_LOGS_FILE, 'w') as f: json.dump([], f)
 
@@ -52,24 +46,20 @@ def log_authentication(user_id, status):
             try: logs = json.load(f)
             except: logs = []
     
-    # Prepend new log
     logs.insert(0, {
         "timestamp": datetime.datetime.now().isoformat(),
         "user_id": user_id, 
         "status": status,
-        "hash_short": f"0x{os.urandom(4).hex()}" # Simulated Blockchain Hash
+        "hash_short": f"0x{os.urandom(4).hex()}" 
     })
     
-    # Keep only last 50 logs
     with open(AUTH_LOGS_FILE, 'w') as f: json.dump(logs[:50], f, indent=4)
 
 def roles_required(*roles):
     def wrapper(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            # Debug: Print what the server sees in the session
             print(f"DEBUG: Checking Role. Session User: {session.get('user_id')}, Role: {session.get('role')}")
-            
             if 'role' not in session: 
                 return jsonify({"error": "Login required"}), 401
             if session['role'] not in roles: 
@@ -78,30 +68,51 @@ def roles_required(*roles):
         return decorated_function
     return wrapper
 
-# --- ROUTES ---
+# --- PAGE ROUTES (FIXED) ---
+
+@app.route('/')
+def home():
+    # This ensures the landing page opens first
+    return render_template('index.html')
+
+@app.route('/index.html')
+def index_page():
+    return render_template('index.html')
+
+@app.route('/authenticate.html')
+def auth_page():
+    return render_template('authenticate.html')
+
+@app.route('/upload.html')
+def upload_page():
+    return render_template('upload.html')
+
+@app.route('/admin_dashboard.html')
+def admin_page():
+    # Optional: Protect this route so only admins can even SEE the page
+    # if 'role' not in session or session['role'] != 'admin':
+    #     return render_template('authenticate.html') # Redirect to login
+    return render_template('Admin_Dashboard.html')
+
+# --- API ROUTES ---
 
 @app.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
     try:
-        # 1. Decode Image
         img_data = data['image'].split(',')[1]
         img_bytes = base64.b64decode(img_data)
         np_arr = np.frombuffer(img_bytes, np.uint8)
         img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
         
         user_id = str(data['user_id']).strip()
-        
-        # 2. Save Image
         path = os.path.join(UPLOAD_FOLDER, f"{user_id}_reg.jpg")
         cv2.imwrite(path, img)
         
-        # 3. Extract Embedding
         embedding = extract_embedding(path)
         if embedding is None: 
             return jsonify({"error": "No face detected in the image"}), 400
         
-        # 4. Save to JSON
         known = load_known_embeddings()
         if user_id in known: 
             known[user_id].append(embedding.tolist())
@@ -121,7 +132,6 @@ def register():
 def authenticate():
     data = request.get_json()
     try:
-        # 1. Decode Image
         img_data = data['image'].split(',')[1]
         img_bytes = base64.b64decode(img_data)
         np_arr = np.frombuffer(img_bytes, np.uint8)
@@ -130,12 +140,10 @@ def authenticate():
         temp_path = os.path.join(UPLOAD_FOLDER, "auth_temp.jpg")
         cv2.imwrite(temp_path, img)
         
-        # 2. Extract Embedding
         embedding = extract_embedding(temp_path)
         if embedding is None: 
             return jsonify({"error": "No face detected"}), 400
         
-        # 3. Compare with Known Faces
         known_embeddings = load_known_embeddings()
         best_match_uid, best_similarity = None, -1
         
@@ -146,7 +154,6 @@ def authenticate():
                     best_similarity = similarity
                     best_match_uid = uid
         
-        # 4. Verify Threshold (0.8 is a safe bet for dlib)
         print(f"AUTH DEBUG: Best match {best_match_uid} with score {best_similarity}")
         
         if best_similarity > 0.8:
@@ -154,7 +161,6 @@ def authenticate():
             session.permanent = True
             session['user_id'] = str(best_match_uid)
             
-            # Grant Admin to specific names or ID "1"
             uid_lower = str(best_match_uid).lower()
             if uid_lower in ["1", "admin", "arsh", "test"]:
                 session['role'] = 'admin'
@@ -189,6 +195,5 @@ def logout():
     return jsonify({"message": "Logged out"})
 
 if __name__ == '__main__':
-    # Run on port 5000
     print("Starting FaceChain Server on http://127.0.0.1:5000")
     app.run(debug=True, port=5000)
