@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, session, render_template
+from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 from face_utils import extract_embedding
 import os, json, base64, cv2, numpy as np
@@ -9,9 +9,7 @@ import datetime
 app = Flask(__name__)
 app.secret_key = 'facechain_secret_key_123' 
 
-# ---------------------------------------------------------------------------
-# 1. CORS & SESSION CONFIG
-# ---------------------------------------------------------------------------
+# CORS & Session Config (Keeping your working setup)
 CORS(app, supports_credentials=True, origins=r".*")
 
 app.config.update(
@@ -30,8 +28,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 if not os.path.exists(AUTH_LOGS_FILE):
     with open(AUTH_LOGS_FILE, 'w') as f: json.dump([], f)
 
-# --- HELPER FUNCTIONS ---
-
 def load_known_embeddings():
     if not os.path.exists(EMBEDDINGS_FILE) or os.path.getsize(EMBEDDINGS_FILE) == 0:
         return {}
@@ -45,57 +41,27 @@ def log_authentication(user_id, status):
         with open(AUTH_LOGS_FILE, 'r') as f:
             try: logs = json.load(f)
             except: logs = []
-    
     logs.insert(0, {
         "timestamp": datetime.datetime.now().isoformat(),
         "user_id": user_id, 
         "status": status,
-        "hash_short": f"0x{os.urandom(4).hex()}" 
+        "hash_short": f"0x{os.urandom(4).hex()}"
     })
-    
     with open(AUTH_LOGS_FILE, 'w') as f: json.dump(logs[:50], f, indent=4)
 
 def roles_required(*roles):
     def wrapper(f):
         @wraps(f)
         def decorated_function(*args, **kwargs):
-            print(f"DEBUG: Checking Role. Session User: {session.get('user_id')}, Role: {session.get('role')}")
             if 'role' not in session: 
                 return jsonify({"error": "Login required"}), 401
             if session['role'] not in roles: 
-                return jsonify({"error": f"Permission denied. You are {session['role']}"}), 403
+                return jsonify({"error": "Permission denied"}), 403
             return f(*args, **kwargs)
         return decorated_function
     return wrapper
 
-# --- PAGE ROUTES (FIXED) ---
-
-@app.route('/')
-def home():
-    # This ensures the landing page opens first
-    return render_template('index.html')
-
-@app.route('/index.html')
-def index_page():
-    return render_template('index.html')
-
-@app.route('/authenticate.html')
-def auth_page():
-    return render_template('authenticate.html')
-
-@app.route('/upload.html')
-def upload_page():
-    return render_template('upload.html')
-
-@app.route('/admin_dashboard.html')
-def admin_page():
-    # Optional: Protect this route so only admins can even SEE the page
-    # if 'role' not in session or session['role'] != 'admin':
-    #     return render_template('authenticate.html') # Redirect to login
-    return render_template('Admin_Dashboard.html')
-
-# --- API ROUTES ---
-
+# --- REGISTER ROUTE (Updated) ---
 @app.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
@@ -110,9 +76,17 @@ def register():
         cv2.imwrite(path, img)
         
         embedding = extract_embedding(path)
-        if embedding is None: 
-            return jsonify({"error": "No face detected in the image"}), 400
         
+        # --- NEW SECURITY CHECKS ---
+        if isinstance(embedding, str) and embedding == "MULTIPLE_FACES":
+            os.remove(path) # Cleanup
+            return jsonify({"error": "⚠️ SECURITY ALERT: Multiple faces detected! Only one person allowed."}), 400
+            
+        if embedding is None: 
+            os.remove(path) # Cleanup
+            return jsonify({"error": "No face detected. Please face the camera clearly."}), 400
+        # ---------------------------
+
         known = load_known_embeddings()
         if user_id in known: 
             known[user_id].append(embedding.tolist())
@@ -120,14 +94,13 @@ def register():
             known[user_id] = [embedding.tolist()]
             
         with open(EMBEDDINGS_FILE, 'w') as f: json.dump(known, f, indent=4)
-        
-        print(f"REGISTER: Success for {user_id}")
         return jsonify({"message": "Face registered successfully", "user_id": user_id})
         
     except Exception as e:
         print(f"REGISTER ERROR: {e}")
         return jsonify({"error": str(e)}), 500
 
+# --- AUTHENTICATE ROUTE (Updated) ---
 @app.route('/authenticate', methods=['POST'])
 def authenticate():
     data = request.get_json()
@@ -141,8 +114,15 @@ def authenticate():
         cv2.imwrite(temp_path, img)
         
         embedding = extract_embedding(temp_path)
+        
+        # --- NEW SECURITY CHECKS ---
+        if isinstance(embedding, str) and embedding == "MULTIPLE_FACES":
+            log_authentication("Security_Alert", "BLOCKED_MULTIPLE_FACES")
+            return jsonify({"error": "⚠️ ACCESS DENIED: Multiple faces detected."}), 400
+            
         if embedding is None: 
             return jsonify({"error": "No face detected"}), 400
+        # ---------------------------
         
         known_embeddings = load_known_embeddings()
         best_match_uid, best_similarity = None, -1
@@ -153,8 +133,6 @@ def authenticate():
                 if similarity > best_similarity: 
                     best_similarity = similarity
                     best_match_uid = uid
-        
-        print(f"AUTH DEBUG: Best match {best_match_uid} with score {best_similarity}")
         
         if best_similarity > 0.8:
             session.clear()
