@@ -1,80 +1,91 @@
 [
     {
-        "timestamp": "2026-01-04T16:41:52.230213",
-        "user_id": "Arsh",
-        "status": "SUCCESS",
-        "hash_short": "0x66c94966"
+        "index": 1,
+        "timestamp": 1768192924.7281852,
+        "log_data": "Genesis Block",
+        "proof": 100,
+        "previous_hash": "0"
     },
     {
-        "timestamp": "2026-01-04T16:41:07.886131",
-        "user_id": "Arsh",
-        "status": "SUCCESS",
-        "hash_short": "0x4485c159"
+        "index": 2,
+        "timestamp": 1768192959.7648838,
+        "log_data": {
+            "user_id": "1",
+            "action": "REGISTER: Arsh Agrawal",
+            "status": "SUCCESS",
+            "ip": "127.0.0.1",
+            "hash_short": "041cbf04ac...",
+            "timestamp": 1768192959764.8838
+        },
+        "proof": 34348,
+        "previous_hash": "041cbf04ac36a0ccebfc9c7b31f9b06630e35785f2f3f20302f6b36835951b79"
     },
     {
-        "timestamp": "2026-01-04T16:40:47.305794",
-        "user_id": "2",
-        "status": "SUCCESS",
-        "hash_short": "0x3a0208a2"
+        "index": 3,
+        "timestamp": 1768192988.3998587,
+        "log_data": {
+            "user_id": "1",
+            "action": "AUTH",
+            "status": "SUCCESS",
+            "ip": "127.0.0.1",
+            "hash_short": "4db30fc7f8...",
+            "timestamp": 1768192988399.8586
+        },
+        "proof": 134796,
+        "previous_hash": "4db30fc7f80e8fbadb1295310908d5857c55b465037ece890d65b9ab781a090a"
     },
     {
-        "timestamp": "2026-01-04T16:40:43.315676",
-        "user_id": "Security_Alert",
-        "status": "BLOCKED_MULTIPLE_FACES",
-        "hash_short": "0x46c5b712"
+        "index": 4,
+        "timestamp": 1768193295.4551697,
+        "log_data": {
+            "user_id": "1",
+            "action": "LOGIN_MFA",
+            "status": "SUCCESS",
+            "ip": "127.0.0.1",
+            "hash_short": "6ed1f0e5f7...",
+            "timestamp": 1768193295455.1697
+        },
+        "proof": 52375,
+        "previous_hash": "6ed1f0e5f7087c1e5ae909ed4741190824a4a65794b486870bd293d229685a6b"
     },
     {
-        "timestamp": "2026-01-04T16:40:42.215210",
-        "user_id": "Security_Alert",
-        "status": "BLOCKED_MULTIPLE_FACES",
-        "hash_short": "0x3c50dd9e"
+        "index": 5,
+        "timestamp": 1768194073.8448856,
+        "log_data": {
+            "user_id": "1",
+            "action": "LOGIN_MFA",
+            "status": "FAILED",
+            "ip": "127.0.0.1",
+            "hash_short": "e7762777dd...",
+            "timestamp": 1768194073844.8855
+        },
+        "proof": 113695,
+        "previous_hash": "e7762777dd30434c20ab1ccfaca12b8ddeec0ce339c1458202f0714fe967ee4e"
     },
     {
-        "timestamp": "2026-01-04T16:40:40.490577",
-        "user_id": "Security_Alert",
-        "status": "BLOCKED_MULTIPLE_FACES",
-        "hash_short": "0x3417b77a"
+        "index": 6,
+        "timestamp": 1768194099.1291409,
+        "log_data": {
+            "user_id": "1",
+            "action": "LOGIN_MFA",
+            "status": "SUCCESS",
+            "ip": "127.0.0.1",
+            "hash_short": "605b29c125...",
+            "timestamp": 1768194099129.1409
+        },
+        "proof": 65286,
+        "previous_hash": "605b29c12583c435c76ea5fa90651647145d691f466da77e8b042ac036ab019a"
     },
     {
-        "timestamp": "2026-01-04T16:40:37.513191",
-        "user_id": "Security_Alert",
-        "status": "BLOCKED_MULTIPLE_FACES",
-        "hash_short": "0x51ca6ad9"
-    },
-    {
-        "timestamp": "2026-01-04T16:40:37.499272",
-        "user_id": "Security_Alert",
-        "status": "BLOCKED_MULTIPLE_FACES",
-        "hash_short": "0xecac712d"
-    },
-    {
-        "timestamp": "2026-01-04T16:40:32.116403",
-        "user_id": "2",
-        "status": "SUCCESS",
-        "hash_short": "0x5690e6a2"
-    },
-    {
-        "timestamp": "2026-01-04T16:40:29.858771",
-        "user_id": "2",
-        "status": "SUCCESS",
-        "hash_short": "0x170f17ba"
-    },
-    {
-        "timestamp": "2026-01-04T16:40:20.351879",
-        "user_id": "2",
-        "status": "SUCCESS",
-        "hash_short": "0x97093fe7"
-    },
-    {
-        "timestamp": "2026-01-04T16:40:15.794215",
-        "user_id": "Security_Alert",
-        "status": "BLOCKED_MULTIPLE_FACES",
-        "hash_short": "0x81899a94"
-    },
-    {
-        "timestamp": "2026-01-04T16:39:48.547772",
-        "user_id": "2",
-        "status": "SUCCESS",
-        "hash_short": "0x51dff902"
+        "index": 7,
+        "timestamp": 1768194355.7604065,
+        "log_data": {
+            "user_id": "1",
+            "action": "LOGIN_MFA",
+            "status": "SUCCESS",
+            "ip": "127.0.0.1"
+        },
+        "proof": 240236,
+        "previous_hash": "502ee71eee7a267e2526824e07d3ae953ea777abc185199e372bcdede99da414"
     }
 ]

@@ -6,116 +6,126 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #020617; font-family: 'Inter', sans-serif; }
-        .hud-container { position: relative; overflow: hidden; border-radius: 12px; border: 1px solid #334155; background: #000; box-shadow: 0 0 30px rgba(6, 182, 212, 0.1); }
-        video { transform: scaleX(-1); width: 100%; height: auto; display: block; opacity: 0.8; }
-        .scanner-line { position: absolute; width: 100%; height: 2px; background: #06b6d4; box-shadow: 0 0 10px #06b6d4; top: 0; animation: scan 3s infinite linear; opacity: 0.7; z-index: 10; }
-        .corner { position: absolute; width: 20px; height: 20px; border: 2px solid #06b6d4; z-index: 5; }
-        .tl { top: 10px; left: 10px; border-right: none; border-bottom: none; }
-        .tr { top: 10px; right: 10px; border-left: none; border-bottom: none; }
-        .bl { bottom: 10px; left: 10px; border-right: none; border-top: none; }
-        .br { bottom: 10px; right: 10px; border-left: none; border-top: none; }
-        @keyframes scan { 0% { top: 0%; opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { top: 100%; opacity: 0; } }
+        body { background-color: #020617; font-family: 'Inter', sans-serif; color: white; }
+        .hud-border { position: relative; border: 1px solid #1e293b; background: black; overflow: hidden; }
+        .scanner-line { position: absolute; width: 100%; height: 2px; background: #06b6d4; box-shadow: 0 0 15px #06b6d4; animation: scan 2s infinite linear; opacity: 0.7; z-index: 10; top: 0; }
+        @keyframes scan { 0% { top: 0%; } 100% { top: 100%; } }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center justify-center text-slate-200">
+<body class="min-h-screen flex flex-col items-center justify-center p-6">
 
     <div class="fixed top-0 left-0 w-full p-6 flex justify-between z-50">
-        <a href="index.html" class="flex items-center gap-2 font-bold text-white">
-            <svg class="w-6 h-6 text-cyan-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
-            Back
-        </a>
-        <div id="roleBadge" class="bg-slate-800 px-3 py-1 rounded-full text-xs font-mono text-slate-400 border border-slate-700">Guest Session</div>
+        <a href="index.html" class="text-cyan-500 font-mono hover:text-white transition-colors">← BACK</a>
     </div>
 
-    <main class="w-full max-w-lg px-6 flex flex-col gap-6">
-        <div class="text-center">
-            <h1 class="text-3xl font-bold text-white tracking-tight">Biometric Verify</h1>
-            <p class="text-slate-500 text-sm mt-1">Align your face within the HUD frame.</p>
-        </div>
-
-        <div class="hud-container">
-            <div class="scanner-line"></div>
-            <div class="corner tl"></div><div class="corner tr"></div>
-            <div class="corner bl"></div><div class="corner br"></div>
-            <video id="video" autoplay playsinline muted></video>
-            
-            <div id="overlayResult" class="absolute inset-0 bg-black/80 flex flex-col items-center justify-center hidden z-20 backdrop-blur-sm">
-                <div class="text-4xl mb-2" id="iconResult"></div>
-                <h3 class="text-xl font-bold text-white" id="textResult"></h3>
-                <p class="font-mono text-xs text-cyan-400 mt-2" id="detailResult"></p>
-                <button onclick="resetUI()" class="mt-6 text-xs text-slate-400 underline hover:text-white">Scan Again</button>
+    <main class="w-full max-w-lg">
+        
+        <div id="step-face" class="flex flex-col gap-6">
+            <div class="text-center">
+                <h1 class="text-3xl font-bold tracking-tight">Biometric Verify</h1>
+                <p class="text-slate-500 text-sm mt-1">Authenticate to access the Node.</p>
             </div>
+
+            <div class="hud-border rounded-xl h-64 md:h-80 shadow-2xl shadow-cyan-900/20">
+                <div class="scanner-line"></div>
+                <video id="video" autoplay playsinline muted class="w-full h-full object-cover opacity-80 scale-x-[-1]"></video>
+                <div id="overlay" class="absolute inset-0 bg-black/80 flex items-center justify-center hidden">
+                    <p id="overlayText" class="text-cyan-400 font-mono animate-pulse">ANALYZING...</p>
+                </div>
+            </div>
+
+            <button onclick="scanFace()" id="scanBtn" class="bg-cyan-600 hover:bg-cyan-500 text-white py-4 rounded-xl font-bold shadow-lg shadow-cyan-500/20 transition-all">
+                INITIATE SCAN
+            </button>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
-            <button id="startBtn" class="bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-xl font-medium transition-colors border border-slate-700">Activate Camera</button>
-            <button id="submitBtn" class="bg-cyan-600 hover:bg-cyan-500 text-white py-3 rounded-xl font-bold shadow-[0_0_15px_rgba(8,145,178,0.4)] transition-all">Verify Identity</button>
+        <div id="step-mfa" class="hidden flex flex-col gap-6 animate-fade-in">
+            <div class="text-center">
+                <div class="w-16 h-16 bg-cyan-900/30 text-cyan-400 rounded-full flex items-center justify-center text-3xl mx-auto mb-4 border border-cyan-500/50">🔒</div>
+                <h1 class="text-2xl font-bold tracking-tight">2FA Required</h1>
+                <p class="text-slate-500 text-sm mt-1">Hello <span id="userNameDisplay" class="text-white font-bold">User</span>. Enter code from your App.</p>
+            </div>
+
+            <input type="text" id="mfaCode" placeholder="000 000" maxlength="6" 
+                class="bg-slate-900 border border-slate-700 text-center text-3xl tracking-[0.5em] text-white p-4 rounded-xl focus:border-cyan-500 outline-none font-mono">
+
+            <button onclick="verifyCode()" class="bg-green-600 hover:bg-green-500 text-white py-4 rounded-xl font-bold shadow-lg shadow-green-500/20 transition-all">
+                UNLOCK SYSTEM
+            </button>
         </div>
 
-        <div id="adminPanelBtn" class="hidden mt-4">
-            <a href="admin_dashboard.html" class="block w-full text-center bg-red-600 hover:bg-red-500 text-white py-3 rounded-xl font-bold transition-all border border-red-400">
-                ⚠️ ACCESS ADMIN TERMINAL
-            </a>
-        </div>
     </main>
 
     <script>
         const video = document.getElementById('video');
-        const overlay = document.getElementById('overlayResult');
-        let stream = null;
+        let currentUserId = null;
 
-        function resetUI() { overlay.classList.add('hidden'); }
+        // Start Camera
+        navigator.mediaDevices.getUserMedia({ video: true }).then(stream => video.srcObject = stream);
 
-        document.getElementById('startBtn').onclick = async () => {
-            try { stream = await navigator.mediaDevices.getUserMedia({ video: true }); video.srcObject = stream; } 
-            catch (err) { alert("Camera Access Denied"); }
-        };
-
-        document.getElementById('submitBtn').onclick = async () => {
-            if (!stream) { alert("Start camera first."); return; }
+        async function scanFace() {
+            const btn = document.getElementById('scanBtn');
+            const overlay = document.getElementById('overlay');
             
-            // Capture
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0);
-            const image = canvas.toDataURL('image/png');
-
-            // UI Feedback
+            btn.disabled = true;
+            btn.classList.add('opacity-50');
             overlay.classList.remove('hidden');
-            document.getElementById('iconResult').innerText = "⏳";
-            document.getElementById('textResult').innerText = "Analyzing Vector...";
-            document.getElementById('detailResult').innerText = "Comparing with blockchain ledger...";
 
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth; 
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
             try {
                 const res = await fetch('http://127.0.0.1:5000/authenticate', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image }), credentials: 'include'
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ image: canvas.toDataURL('image/jpeg') })
                 });
-                const data = await res.json();
 
+                const data = await res.json();
+                
                 if (data.match) {
-                    document.getElementById('iconResult').innerText = "✅";
-                    document.getElementById('textResult').innerText = "ACCESS GRANTED";
-                    document.getElementById('textResult').className = "text-xl font-bold text-green-400";
-                    document.getElementById('detailResult').innerText = `ID: ${data.user_id} | Role: ${data.role.toUpperCase()}`;
-                    
-                    const badge = document.getElementById('roleBadge');
-                    badge.innerText = `${data.role.toUpperCase()} Active`;
-                    badge.className = data.role === 'admin' ? "bg-red-900/50 text-red-200 border border-red-500 px-3 py-1 rounded-full text-xs" : "bg-cyan-900/50 text-cyan-200 border border-cyan-500 px-3 py-1 rounded-full text-xs";
-                    
-                    if (data.role === 'admin') document.getElementById('adminPanelBtn').style.display = 'block';
+                    // Switch to MFA Step
+                    currentUserId = data.user_id;
+                    document.getElementById('userNameDisplay').innerText = data.name || "Admin";
+                    document.getElementById('step-face').classList.add('hidden');
+                    document.getElementById('step-mfa').classList.remove('hidden');
                 } else {
-                    document.getElementById('iconResult').innerText = "❌";
-                    document.getElementById('textResult').innerText = "ACCESS DENIED";
-                    document.getElementById('textResult').className = "text-xl font-bold text-red-500";
-                    document.getElementById('detailResult').innerText = "Biometric mismatch. Try again.";
+                    alert("❌ Face Not Recognized");
+                    overlay.classList.add('hidden');
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-50');
                 }
             } catch (err) {
-                document.getElementById('textResult').innerText = "System Error";
-                document.getElementById('detailResult').innerText = "Check API connection";
+                alert("System Error: " + err.message);
+                overlay.classList.add('hidden');
+                btn.disabled = false;
             }
-        };
+        }
+
+        async function verifyCode() {
+            const code = document.getElementById('mfaCode').value;
+            if (code.length < 6) return alert("Enter 6 digits");
+
+            try {
+                const res = await fetch('http://127.0.0.1:5000/verify-mfa', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: currentUserId, code: code }),
+                    credentials: 'include'
+                });
+                
+                const data = await res.json();
+
+                if (data.success) {
+                    if (data.role === 'admin') window.location.href = "admin_dashboard.html";
+                    else alert("Access Granted (User Mode)");
+                } else {
+                    alert("❌ Invalid Code!");
+                }
+            } catch (err) { alert("Connection Error"); }
+        }
     </script>
 </body>
 </html>

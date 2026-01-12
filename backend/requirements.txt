@@ -1,6 +1,9 @@
 flask
 flask-cors
-opencv-python-headless
+flask-session
 numpy
+opencv-python-headless
 dlib
-pillow
+face_recognition
+pyotp
+qrcode
