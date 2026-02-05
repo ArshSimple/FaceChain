@@ -7,6 +7,7 @@ from eth_chain import eth_ledger as ledger
 import os
 import re
 import json
+import numpy as np  # Added to handle array checks
 
 # Configuration for finding frontend files
 FRONTEND_FOLDER = os.path.abspath("../frontend")
@@ -47,8 +48,13 @@ def register():
         if encoding is None: 
             return jsonify({"error": "No face detected"}), 400
 
-        # 3. Check for Duplicates
-        existing_id, _ = face_utils.find_match(encoding)
+        # ⚡ FIX: Convert Numpy Array to List for JSON Serialization ⚡
+        if hasattr(encoding, 'tolist'):
+            encoding = encoding.tolist()
+
+        # 3. Check for Duplicates (Local Check)
+        # Note: We convert back to array if find_match expects it, but usually lists work fine for comparison checks
+        existing_id, _ = face_utils.find_match(np.array(encoding))
         if existing_id: 
             return jsonify({"error": f"Face already registered as {existing_id}"}), 400
 
@@ -57,13 +63,19 @@ def register():
         uri = pyotp.totp.TOTP(mfa_secret).provisioning_uri(name=str(user_id), issuer_name="FaceChain")
         role = "admin" if str(user_id) == "1" else "user"
         
-        # 5. Save to Database
+        # 5. Save to Local Database (For Backup/Fast Match)
+        # Now passing a LIST, so json.dump won't crash
         face_utils.save_embedding(user_id, encoding, mfa_secret, role, name)
         
-        # 6. Write to Ethereum Blockchain
-        ledger.add_log(user_id, f"REGISTER: {name}", "SUCCESS", request.remote_addr)
+        # 6. REGISTER ON BLOCKCHAIN (The New Step)
+        success = ledger.register_user(user_id, encoding)
+        
+        if success:
+            ledger.add_log(user_id, f"REGISTER: {name}", "SUCCESS", request.remote_addr)
+            return jsonify({"message": "Registered On-Chain", "mfa_uri": uri})
+        else:
+            return jsonify({"error": "Blockchain Registration Failed"}), 500
 
-        return jsonify({"message": "Registered", "mfa_uri": uri})
     except Exception as e:
         print(f"Server Error: {e}")
         return jsonify({"error": str(e)}), 500
@@ -79,10 +91,15 @@ def authenticate():
     encoding = face_utils.get_face_embedding(img_rgb)
     if encoding is None: return jsonify({"match": False}), 200
 
+    # Find match locally first to get the User ID
+    # We pass the raw numpy array here because dlib/face_recognition expects it for math
     user_id, user_data = face_utils.find_match(encoding)
 
     if user_id:
-        # DO NOT LOGIN YET. Just confirm face match.
+        # OPTIONAL: Perform On-Chain Verification here
+        # We convert to list() because Blockchain functions need clean numbers, not numpy objects
+        ledger.verify_user(user_id, encoding.tolist())
+
         return jsonify({
             "match": True, 
             "user_id": user_id, 
@@ -104,26 +121,30 @@ def verify_mfa():
     if not user: 
         return jsonify({"success": False, "message": "User not found"}), 400
 
+    # Check if MFA is globally enabled for this user
+    if user.get('mfa_enabled', True) == False:
+         session['user_id'] = user_id
+         session['role'] = user['role']
+         session['logged_in'] = True
+         ledger.add_log(user_id, "LOGIN_NO_MFA", "SUCCESS", request.remote_addr)
+         return jsonify({"success": True, "role": user['role']})
+
     # Verify TOTP Code
     totp = pyotp.TOTP(user['mfa_secret'])
     if totp.verify(code):
-        # Create Session
         session['user_id'] = user_id
         session['role'] = user['role']
         session['logged_in'] = True
         
-        # Write Login to Ethereum
         ledger.add_log(user_id, "LOGIN_MFA", "SUCCESS", request.remote_addr)
         return jsonify({"success": True, "role": user['role']})
     
-    # Log Failure
     ledger.add_log(user_id, "LOGIN_MFA", "FAILED", request.remote_addr)
     return jsonify({"success": False, "message": "Invalid Code"})
 
 # --- ROUTE: ADMIN DASHBOARD DATA ---
 @app.route('/admin/stats', methods=['GET'])
 def admin_stats():
-    # Security Check
     if not session.get('logged_in') or session.get('role') != 'admin':
          return jsonify({"error": "Unauthorized"}), 401
     
@@ -131,9 +152,16 @@ def admin_stats():
     
     # FETCH LOGS FROM ETHEREUM SMART CONTRACT
     logs = ledger.get_logs()
-    logs.reverse() # Show newest first
+    
+    # Convert DB to list for frontend
+    user_list = []
+    for k, v in db.items():
+        user_list.append({
+            "id": k, 
+            "name": v.get("name", "Unknown"),
+            "mfa_enabled": v.get("mfa_enabled", True)
+        })
 
-    user_list = [{"id": k, "name": v.get("name", "Unknown")} for k, v in db.items()]
     return jsonify({"total_users": len(db), "user_list": user_list, "logs": logs})
 
 # --- ROUTE: DELETE USER ---
@@ -144,37 +172,58 @@ def delete_user():
     
     user_to_delete = request.json.get('user_id')
     
-    # 🛑 SECURITY: PROTECT ADMIN
     if str(user_to_delete) == "1":
         return jsonify({"error": "Cannot delete the Super Admin!"}), 403
 
     db = face_utils.load_embeddings()
     if user_to_delete in db:
+        deleted_name = db[user_to_delete].get('name', 'Unknown')
+        
         del db[user_to_delete]
         with open(face_utils.EMBEDDINGS_FILE, 'w') as f: 
             json.dump(db, f)
         
-        # Log Deletion to Blockchain
-        ledger.add_log(session['user_id'], f"DELETE_USER: {user_to_delete}", "SUCCESS", request.remote_addr)
+        ledger.add_log(session['user_id'], f"DELETE: {deleted_name} (ID: {user_to_delete})", "SUCCESS", request.remote_addr)
         return jsonify({"message": "User deleted"})
     
     return jsonify({"error": "User not found"}), 404
 
-# --- ROUTE: LOGOUT (FIXED) ---
+# --- ROUTE: TOGGLE MFA ---
+@app.route('/admin/toggle_mfa', methods=['POST'])
+def toggle_mfa():
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    data = request.json
+    user_id = data.get('user_id')
+    
+    db = face_utils.load_embeddings()
+    if user_id in db:
+        # Toggle Status
+        current_status = db[user_id].get('mfa_enabled', True)
+        new_status = not current_status
+        db[user_id]['mfa_enabled'] = new_status
+        
+        with open(face_utils.EMBEDDINGS_FILE, 'w') as f:
+            json.dump(db, f)
+            
+        status_text = "ENABLED" if new_status else "DISABLED"
+        ledger.add_log(session['user_id'], f"MFA_CHANGE: User {user_id} set to {status_text}", "SUCCESS", request.remote_addr)
+        
+        return jsonify({"success": True, "new_status": new_status})
+    
+    return jsonify({"error": "User not found"}), 404
+
+# --- ROUTE: LOGOUT ---
 @app.route('/logout')
 def logout():
-    # 1. Capture user info BEFORE destroying session
     user_id = session.get('user_id')
-    
-    # 2. Log to Ethereum Ledger if user was logged in
     if user_id:
         try:
             ledger.add_log(user_id, "LOGOUT", "SUCCESS", request.remote_addr)
-            print(f"✅ Logout logged for User {user_id}")
         except Exception as e:
             print(f"⚠️ Failed to log logout: {e}")
 
-    # 3. NOW destroy session
     session.clear()
     return jsonify({"message": "Logged out"})
 
