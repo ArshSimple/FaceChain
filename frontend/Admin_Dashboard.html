@@ -85,7 +85,6 @@
 
         function renderUsers(users) {
             document.getElementById('userTableBody').innerHTML = users.map(u => {
-                // Exam Status Badges
                 let status = u.exam_subjects.map(s => {
                     let verified = u.exams_verified && u.exams_verified.includes(s);
                     let color = verified ? "bg-blue-500/10 text-blue-400 border-blue-500/30" : "bg-slate-800 text-slate-500 border-slate-700";
@@ -93,7 +92,6 @@
                     return `<span class="px-2 py-1 text-[10px] border rounded mr-1 ${color}">${s} ${icon}</span>`;
                 }).join('');
 
-                // MFA Button Style
                 let mfaClass = u.mfa_enabled 
                     ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
                     : "bg-slate-700 text-slate-400 border-slate-600";
@@ -156,15 +154,24 @@
             }
         }
 
+        // --- UPDATED FUNCTIONS TO MATCH NEW BACKEND ---
         async function deleteUser(id) {
             if(confirm('Delete User?')) {
-                await fetch('/admin/delete_user', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id:id})});
+                await fetch('/admin/user_ops', {
+                    method:'POST', 
+                    headers:{'Content-Type':'application/json'}, 
+                    body:JSON.stringify({user_id:id, action:'delete'})
+                });
                 loadData();
             }
         }
 
         async function toggleMFA(id) {
-            await fetch('/admin/toggle_mfa', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id:id})});
+            await fetch('/admin/user_ops', {
+                method:'POST', 
+                headers:{'Content-Type':'application/json'}, 
+                body:JSON.stringify({user_id:id, action:'toggle_mfa'})
+            });
             loadData();
         }
 

@@ -1,9 +1,9 @@
 flask
 flask-cors
-flask-session
-numpy
-opencv-python-headless
-dlib
+flask-limiter
 face_recognition
+numpy
+opencv-python
+web3
 pyotp
 qrcode
