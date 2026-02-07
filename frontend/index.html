@@ -2,111 +2,285 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FaceChain | Decentralized Identity</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <title>FaceChain Secure Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
-                    colors: { brand: { 500: '#06b6d4', 600: '#0891b2', 900: '#164e63' } }
-                }
-            }
-        }
-    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
-        body { background-color: #020617; background-image: radial-gradient(at 50% 0%, #1e293b 0px, transparent 50%); }
-        .glass { background: rgba(30, 41, 59, 0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
-        .hero-glow { position: absolute; top: -100px; left: 50%; transform: translateX(-50%); width: 600px; height: 600px; background: radial-gradient(circle, rgba(6,182,212,0.15) 0%, rgba(0,0,0,0) 70%); pointer-events: none; z-index: -1; }
+        .hidden-section { display: none !important; }
+        .mirror-mode { transform: scaleX(-1); }
+        .correct-answer { background-color: #ecfdf5; border-left: 4px solid #10b981; }
+        .wrong-answer { background-color: #fef2f2; border-left: 4px solid #ef4444; }
     </style>
 </head>
-<body class="text-slate-200 min-h-screen flex flex-col antialiased selection:bg-brand-500 selection:text-white">
-
-    <nav class="sticky top-0 z-50 glass border-b border-slate-800">
-        <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <div class="w-8 h-8 bg-brand-500 rounded flex items-center justify-center text-black font-bold text-lg">F</div>
-                <span class="font-bold text-xl tracking-tight text-white">FaceChain</span>
-            </div>
-            <div class="flex gap-6 text-sm font-medium text-slate-400">
-                <a href="index.html" class="hover:text-brand-500 transition-colors text-white">Home</a>
-                <a href="upload.html" class="hover:text-brand-500 transition-colors">Register</a>
-                <a href="authenticate.html" class="hover:text-brand-500 transition-colors">Authenticate</a>
-                <a id="adminNavLink" href="admin_dashboard.html" class="text-red-500 hidden hover:text-red-400">Admin</a>
-            </div>
-        </div>
+<body class="bg-slate-900 text-slate-200 min-h-screen">
+    <nav class="bg-slate-800 p-4 border-b border-slate-700 flex justify-between items-center sticky top-0 z-50">
+        <h1 class="font-bold text-xl text-white">FACECHAIN <span class="text-blue-400">SECURE</span></h1>
+        <button onclick="logout()" class="text-sm text-slate-400 hover:text-white">Logout</button>
     </nav>
 
-    <main class="flex-1 relative overflow-hidden">
-        <div class="hero-glow"></div>
-        
-        <div class="max-w-5xl mx-auto px-6 pt-20 pb-32 text-center">
-            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-brand-500/30 bg-brand-500/10 text-brand-500 text-xs font-mono font-bold mb-8 uppercase tracking-wider">
-                <span class="relative flex h-2 w-2">
-                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75"></span>
-                  <span class="relative inline-flex rounded-full h-2 w-2 bg-brand-500"></span>
-                </span>
-                System Operational
+    <div class="max-w-5xl mx-auto p-6 mt-8">
+        <div id="section-home" class="text-center py-10">
+            <h2 class="text-5xl font-bold text-white mb-10">Examination Portal</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div onclick="showSection('section-register')" class="bg-slate-800 p-10 rounded-2xl border border-slate-700 hover:border-blue-500 cursor-pointer shadow-lg">
+                    <div class="text-5xl mb-4">📝</div>
+                    <h3 class="text-2xl font-bold text-white">New Student</h3>
+                    <p class="text-slate-400">Register with Roll No & Face ID</p>
+                </div>
+                <div onclick="startLogin()" class="bg-slate-800 p-10 rounded-2xl border border-slate-700 hover:border-emerald-500 cursor-pointer shadow-lg">
+                    <div class="text-5xl mb-4">🔐</div>
+                    <h3 class="text-2xl font-bold text-white">Student Login</h3>
+                    <p class="text-slate-400">Enter Exam Hall</p>
+                </div>
             </div>
+        </div>
 
-            <h1 class="text-6xl md:text-7xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-200 to-slate-500 tracking-tight leading-tight mb-6">
-                Identity on the <br> <span class="text-brand-500">Blockchain</span>.
-            </h1>
+        <div id="section-register" class="hidden-section bg-slate-800 p-8 rounded-2xl border border-slate-700 max-w-3xl mx-auto">
+            <h2 class="text-2xl font-bold text-white mb-6">📝 Student Registration</h2>
+            <div class="space-y-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <input type="text" id="reg-roll" placeholder="Roll Number (User ID)" class="bg-slate-900 border border-slate-600 rounded p-3 text-white">
+                    <input type="text" id="reg-name" placeholder="Full Name" class="bg-slate-900 border border-slate-600 rounded p-3 text-white">
+                </div>
+                <div class="bg-slate-900 p-4 rounded border border-slate-700">
+                    <label class="block mb-2 font-bold text-slate-400">Subjects:</label>
+                    <div class="flex gap-4">
+                        <label class="flex items-center gap-2"><input type="checkbox" class="subject-cb" value="Blockchain"> Blockchain</label>
+                        <label class="flex items-center gap-2"><input type="checkbox" class="subject-cb" value="Network Security"> Net Sec</label>
+                        <label class="flex items-center gap-2"><input type="checkbox" class="subject-cb" value="AI/ML"> AI/ML</label>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="flex gap-2 mb-2">
+                        <button onclick="toggleInput('camera')" class="px-4 py-1 bg-blue-600 text-white rounded text-sm">Webcam</button>
+                        <button onclick="toggleInput('upload')" class="px-4 py-1 bg-slate-700 text-slate-300 rounded text-sm">Upload</button>
+                    </div>
+                    <div id="camera-container" class="relative bg-black rounded-lg overflow-hidden h-64 border border-slate-600">
+                        <video id="video" class="w-full h-full object-cover mirror-mode" autoplay playsinline></video>
+                        <canvas id="canvas" class="hidden-section"></canvas>
+                    </div>
+                    <div id="upload-container" class="hidden-section bg-slate-900 border-2 border-dashed border-slate-600 rounded-lg h-64 flex flex-col items-center justify-center cursor-pointer" onclick="document.getElementById('file-upload').click()">
+                        <input type="file" id="file-upload" accept="image/*" class="hidden" onchange="handleFileUpload(this)">
+                        <img id="preview-img" class="h-full w-full object-contain hidden-section">
+                        <div id="upload-placeholder" class="text-slate-500">Click to Upload Image</div>
+                    </div>
+                    <button onclick="captureFace()" id="btn-capture" class="mt-2 w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded">Capture</button>
+                    <p id="capture-status" class="hidden-section text-center text-emerald-400 mt-2">✅ Photo Ready</p>
+                </div>
+
+                <div class="flex gap-4">
+                    <button onclick="location.reload()" class="w-1/3 bg-slate-700 text-white py-3 rounded">Cancel</button>
+                    <button onclick="registerUser()" class="w-2/3 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded">Register</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="mfa-popup" class="hidden-section fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+            <div class="bg-slate-900 p-8 rounded-2xl border border-slate-700 text-center">
+                <h3 class="text-2xl font-bold text-white mb-4">Setup 2FA</h3>
+                <div class="bg-white p-4 rounded inline-block mb-4"><div id="qrcode"></div></div>
+                <button onclick="location.reload()" class="block w-full bg-emerald-600 text-white py-2 rounded">Done</button>
+            </div>
+        </div>
+
+        <div id="section-exam" class="hidden-section bg-slate-800 p-8 rounded-2xl border border-slate-700">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-4 mb-6">
+                <h2 class="text-2xl font-bold text-white">Student Dashboard</h2>
+                <p class="text-slate-400">Roll No: <span id="student-id-display" class="text-blue-400 font-mono">--</span></p>
+            </div>
+            <div id="exam-list" class="space-y-4"></div>
             
-            <p class="text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed mb-10">
-                Secure, decentralized facial authentication. Your biometric signature is hashed into 128D vectors and stored immutably. No central databases. No compromises.
-            </p>
-
-            <div class="flex justify-center gap-4">
-                <a href="authenticate.html" class="bg-brand-600 hover:bg-brand-500 text-white px-8 py-4 rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(6,182,212,0.3)] hover:shadow-[0_0_30px_rgba(6,182,212,0.5)]">
-                    Verify Identity
-                </a>
-                <a href="upload.html" class="glass hover:bg-slate-800 text-white px-8 py-4 rounded-xl font-bold transition-all">
-                    Register New ID
-                </a>
-                <a id="heroAdminBtn" href="admin_dashboard.html" class="hidden bg-red-600/90 hover:bg-red-500 text-white px-8 py-4 rounded-xl font-bold transition-all">
-                    Admin Panel
-                </a>
+            <div id="active-exam-paper" class="hidden-section mt-8 pt-6 border-t border-slate-700">
+                <h3 id="paper-title" class="text-3xl font-bold text-white mb-4"></h3>
+                <div id="questions-container" class="space-y-6"></div>
+                <div class="mt-8 flex gap-4">
+                    <button id="btn-submit" onclick="submitExam()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded">Submit Exam</button>
+                    <button id="btn-close" onclick="closeExam()" class="hidden-section w-full bg-slate-700 text-white py-3 rounded">Return</button>
+                </div>
             </div>
         </div>
-
-        <div class="max-w-7xl mx-auto px-6 pb-20 grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="glass p-8 rounded-2xl hover:-translate-y-1 transition-transform duration-300">
-                <div class="w-12 h-12 bg-slate-800 rounded-lg flex items-center justify-center text-2xl mb-4 border border-slate-700">🔒</div>
-                <h3 class="text-xl font-bold text-white mb-2">Immutable Ledger</h3>
-                <p class="text-slate-400 text-sm leading-relaxed">Identity hashes are permanently stored on the blockchain. Once registered, the record cannot be altered or deleted by bad actors.</p>
-            </div>
-            <div class="glass p-8 rounded-2xl hover:-translate-y-1 transition-transform duration-300">
-                <div class="w-12 h-12 bg-slate-800 rounded-lg flex items-center justify-center text-2xl mb-4 border border-slate-700">👤</div>
-                <h3 class="text-xl font-bold text-white mb-2">128D Vectorization</h3>
-                <p class="text-slate-400 text-sm leading-relaxed">We use ResNet models to convert facial features into mathematical coordinates. Your actual photo is never stored.</p>
-            </div>
-            <div class="glass p-8 rounded-2xl hover:-translate-y-1 transition-transform duration-300">
-                <div class="w-12 h-12 bg-slate-800 rounded-lg flex items-center justify-center text-2xl mb-4 border border-slate-700">⚡</div>
-                <h3 class="text-xl font-bold text-white mb-2">Local Auth</h3>
-                <p class="text-slate-400 text-sm leading-relaxed">Authentication happens via a local Flask API that communicates with the blockchain node, ensuring low latency.</p>
-            </div>
-        </div>
-    </main>
-
-    <footer class="border-t border-slate-800 py-8 text-center text-slate-600 text-sm font-mono">
-        <p>FACECHAIN PROTOCOL v1.0 • POWERED BY ETHEREUM & PYTHON</p>
-    </footer>
+    </div>
 
     <script>
-        async function checkSession() {
-            try {
-                const res = await fetch('http://127.0.0.1:5000/admin/stats', { credentials: 'include' });
-                if (res.ok) {
-                    document.getElementById('adminNavLink').style.display = 'block';
-                    document.getElementById('heroAdminBtn').style.display = 'block';
-                }
-            } catch (err) { console.log("Guest Session"); }
+        const API_URL = "http://127.0.0.1:5000";
+        let capturedImage = null;
+        let examSchedule = {};
+
+        // Question Bank
+        const QUESTION_BANK = {
+            "Blockchain": [
+                { q: "What is the genesis block?", options: ["First block", "Last block", "Orphan block"], ans: "First block" },
+                { q: "Which consensus is PoW?", options: ["Proof of Work", "Proof of Stake", "Proof of Auth"], ans: "Proof of Work" },
+                { q: "Smart Contracts are stored on?", options: ["Server", "Blockchain", "Client"], ans: "Blockchain" }
+            ],
+            "Network Security": [
+                { q: "HTTPS Port?", options: ["80", "443", "22"], ans: "443" },
+                { q: "What is Phishing?", options: ["Fake Site", "Virus", "Trojan"], ans: "Fake Site" },
+                { q: "SSL stands for?", options: ["Secure Socket Layer", "System Layer", "Speed Layer"], ans: "Secure Socket Layer" }
+            ],
+            "AI/ML": [
+                { q: "Supervised learning uses?", options: ["Labeled Data", "Unlabeled Data"], ans: "Labeled Data" },
+                { q: "Library for Deep Learning?", options: ["React", "TensorFlow", "Pandas"], ans: "TensorFlow" }
+            ]
+        };
+
+        function showSection(id) {
+            document.querySelectorAll('.hidden-section').forEach(el => el.classList.add('hidden-section')); // Clear all
+            document.querySelectorAll('[id^="section-"]').forEach(el => el.classList.add('hidden-section')); // Clear main sections
+            document.getElementById(id).classList.remove('hidden-section'); // Show target
+            if(id === 'section-register') toggleInput('camera');
         }
-        window.onload = checkSession;
+
+        function logout() { location.reload(); }
+
+        // --- CAMERA ---
+        function toggleInput(mode) {
+            if(mode === 'camera') {
+                document.getElementById('camera-container').classList.remove('hidden-section');
+                document.getElementById('upload-container').classList.add('hidden-section');
+                document.getElementById('btn-capture').classList.remove('hidden-section');
+                navigator.mediaDevices.getUserMedia({video:true}).then(s => document.getElementById('video').srcObject = s);
+            } else {
+                document.getElementById('camera-container').classList.add('hidden-section');
+                document.getElementById('upload-container').classList.remove('hidden-section');
+                document.getElementById('btn-capture').classList.add('hidden-section');
+                let v = document.getElementById('video'); if(v.srcObject) v.srcObject.getTracks().forEach(t=>t.stop());
+            }
+        }
+
+        function captureFace() {
+            let v = document.getElementById('video');
+            let c = document.getElementById('canvas');
+            c.width = v.videoWidth; c.height = v.videoHeight;
+            let ctx = c.getContext('2d');
+            ctx.translate(c.width, 0); ctx.scale(-1, 1); ctx.drawImage(v, 0, 0);
+            capturedImage = c.toDataURL('image/jpeg');
+            document.getElementById('capture-status').classList.remove('hidden-section');
+        }
+
+        function handleFileUpload(input) {
+            let reader = new FileReader();
+            reader.onload = function(e) { 
+                capturedImage = e.target.result; 
+                document.getElementById('preview-img').src = capturedImage;
+                document.getElementById('preview-img').classList.remove('hidden-section');
+                document.getElementById('upload-placeholder').classList.add('hidden-section');
+                document.getElementById('capture-status').classList.remove('hidden-section');
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+
+        // --- API CALLS ---
+        async function registerUser() {
+            let roll = document.getElementById('reg-roll').value;
+            let name = document.getElementById('reg-name').value;
+            let subs = Array.from(document.querySelectorAll('.subject-cb:checked')).map(c=>c.value);
+            if(!roll || !capturedImage) return alert("Fill data & capture photo");
+            
+            let res = await fetch(`${API_URL}/register`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id:roll, name:name, roll_no:roll, exam_subjects:subs, image:capturedImage})});
+            let data = await res.json();
+            if(data.mfa_uri) {
+                document.getElementById('qrcode').innerHTML = "";
+                new QRCode(document.getElementById('qrcode'), data.mfa_uri);
+                document.getElementById('mfa-popup').classList.remove('hidden-section');
+            } else alert(data.error);
+        }
+
+        async function startLogin() {
+            let roll = prompt("Enter Roll No:");
+            if(!roll) return;
+            alert("Look at camera...");
+            let v = document.createElement('video'); v.autoplay=true;
+            navigator.mediaDevices.getUserMedia({video:true}).then(async s => {
+                v.srcObject=s; await new Promise(r=>setTimeout(r,1500));
+                let c = document.createElement('canvas'); c.width=640; c.height=480;
+                c.getContext('2d').drawImage(v,0,0,c.width,c.height);
+                let img = c.toDataURL('image/jpeg'); s.getTracks().forEach(t=>t.stop());
+
+                let res = await fetch(`${API_URL}/authenticate`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id:roll, image:img})});
+                let data = await res.json();
+                if(data.match) {
+                    let code = data.mfa_required ? prompt("MFA Code:") : "000000";
+                    if(code) verifyMFA(roll, code);
+                } else alert("Face Mismatch");
+            });
+        }
+
+        async function verifyMFA(uid, code) {
+            let res = await fetch(`${API_URL}/verify-mfa`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id:uid, code:code})});
+            let data = await res.json();
+            if(data.success) {
+                examSchedule = data.schedule;
+                document.getElementById('student-id-display').innerText = uid;
+                if(data.role === 'admin') window.location.href="admin_dashboard.html";
+                else { renderExamList(data.exam_subjects); showSection('section-exam'); }
+            } else alert("Invalid Code");
+        }
+
+        // --- EXAM LOGIC ---
+        function renderExamList(subs) {
+            let list = document.getElementById('exam-list'); list.innerHTML="";
+            let today = new Date().toISOString().split('T')[0];
+            subs.forEach(s => {
+                let date = examSchedule[s] || "TBA";
+                let btn = "bg-slate-700 text-slate-500 cursor-not-allowed";
+                let disabled = "disabled";
+                let badge = `<span class="text-slate-500">Scheduled: ${date}</span>`;
+
+                if(date === today) {
+                    btn = "bg-blue-600 hover:bg-blue-500 text-white shadow";
+                    disabled = "";
+                    badge = `<span class="text-emerald-400 font-bold">● LIVE NOW</span>`;
+                }
+
+                list.innerHTML += `
+                    <div class="bg-slate-900 p-4 rounded border border-slate-700 flex justify-between items-center">
+                        <div><h4 class="font-bold text-white">${s}</h4><div class="text-sm">${badge}</div></div>
+                        <button onclick="startExam('${s}')" ${disabled} class="px-6 py-2 rounded ${btn}">Start</button>
+                    </div>`;
+            });
+        }
+
+        async function startExam(sub) {
+            // CALL BACKEND TO TRACK "VERIFIED" STATUS
+            await fetch(`${API_URL}/mark_exam_verified`, {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ subject: sub })
+            });
+
+            // UI LOGIC
+            let qs = QUESTION_BANK[sub] || [];
+            document.getElementById('exam-list').classList.add('hidden-section');
+            document.getElementById('active-exam-paper').classList.remove('hidden-section');
+            document.getElementById('paper-title').innerText = sub;
+            let c = document.getElementById('questions-container'); c.innerHTML="";
+            qs.forEach((q,i) => {
+                let opts = q.options.map(o => `<label class="block bg-slate-900 p-3 rounded mb-2 cursor-pointer border border-slate-700 hover:border-blue-500"><input type="radio" name="q${i}" value="${o}" class="mr-2 accent-blue-500"> ${o}</label>`).join('');
+                c.innerHTML += `<div class="q-block bg-slate-800 p-6 rounded border border-slate-700" data-ans="${q.ans}"><p class="font-bold text-white mb-4">Q${i+1}. ${q.q}</p>${opts}</div>`;
+            });
+            document.getElementById('btn-submit').classList.remove('hidden-section');
+            document.getElementById('btn-close').classList.add('hidden-section');
+        }
+
+        function submitExam() {
+            let score=0; let blocks=document.querySelectorAll('.q-block');
+            blocks.forEach(b => {
+                let ans = b.dataset.ans;
+                let inps = b.querySelectorAll('input');
+                let sel = null;
+                inps.forEach(i => { if(i.checked) sel=i.value; i.disabled=true; });
+                if(sel===ans) { score++; b.classList.add('correct-answer'); }
+                else if(sel) b.classList.add('wrong-answer');
+            });
+            alert(`Score: ${score}/${blocks.length}`);
+            document.getElementById('btn-submit').classList.add('hidden-section');
+            document.getElementById('btn-close').classList.remove('hidden-section');
+        }
+        function closeExam() {
+            document.getElementById('active-exam-paper').classList.add('hidden-section');
+            document.getElementById('exam-list').classList.remove('hidden-section');
+        }
     </script>
 </body>
 </html>

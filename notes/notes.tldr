@@ -19,13 +19,13 @@
 			"com.tldraw.shape.group": 0,
 			"com.tldraw.shape.text": 4,
 			"com.tldraw.shape.bookmark": 2,
-			"com.tldraw.shape.draw": 3,
+			"com.tldraw.shape.draw": 4,
 			"com.tldraw.shape.geo": 11,
 			"com.tldraw.shape.note": 10,
 			"com.tldraw.shape.line": 5,
 			"com.tldraw.shape.frame": 1,
 			"com.tldraw.shape.arrow": 8,
-			"com.tldraw.shape.highlight": 2,
+			"com.tldraw.shape.highlight": 3,
 			"com.tldraw.shape.embed": 4,
 			"com.tldraw.shape.image": 5,
 			"com.tldraw.shape.video": 4,
@@ -48,24 +48,105 @@
 			"typeName": "document"
 		},
 		{
-			"x": -6884.065606368219,
-			"y": -3312.0579529310507,
+			"x": 7825.202645902597,
+			"y": 3203.0492080682334,
+			"z": 0.6430436100000001,
+			"meta": {},
+			"id": "camera:page:page",
+			"typeName": "camera"
+		},
+		{
+			"x": 0,
+			"y": 0,
+			"lastActivityTimestamp": 0,
+			"meta": {},
+			"id": "pointer:pointer",
+			"typeName": "pointer"
+		},
+		{
+			"followingUserId": null,
+			"opacityForNextShape": 1,
+			"stylesForNextShape": {
+				"tldraw:geo": "rectangle"
+			},
+			"brush": null,
+			"scribbles": [],
+			"cursor": {
+				"type": "cross",
+				"rotation": 0
+			},
+			"isFocusMode": false,
+			"exportBackground": true,
+			"isDebugMode": false,
+			"isToolLocked": true,
+			"screenBounds": {
+				"x": 0,
+				"y": 0,
+				"w": 1188,
+				"h": 623.2000122070312
+			},
+			"insets": [
+				false,
+				false,
+				true,
+				false
+			],
+			"zoomBrush": null,
+			"isGridMode": false,
+			"isPenMode": false,
+			"chatMessage": "",
+			"isChatting": false,
+			"highlightedUserIds": [],
+			"isFocused": true,
+			"devicePixelRatio": 1.25,
+			"isCoarsePointer": false,
+			"isHoveringCanvas": false,
+			"openMenus": [],
+			"isChangingStyle": false,
+			"isReadonly": false,
+			"meta": {},
+			"duplicateProps": null,
+			"id": "instance:instance",
+			"currentPageId": "page:page",
+			"typeName": "instance"
+		},
+		{
+			"editingShapeId": null,
+			"croppingShapeId": null,
+			"selectedShapeIds": [
+				"shape:DnBC0sZ69Ok_MA2aRBxp0"
+			],
+			"hoveredShapeId": null,
+			"erasingShapeIds": [],
+			"hintingShapeIds": [],
+			"focusedGroupId": null,
+			"meta": {},
+			"id": "instance_page_state:page:page",
+			"pageId": "page:page",
+			"typeName": "instance_page_state"
+		},
+		{
+			"x": -7342.922766755304,
+			"y": -3099.2843050534907,
 			"rotation": 0,
 			"isLocked": false,
 			"opacity": 1,
 			"meta": {},
-			"id": "shape:qCFO6C0gT7X6dxhfU0ZHZ",
+			"id": "shape:DnBC0sZ69Ok_MA2aRBxp0",
 			"type": "text",
 			"props": {
 				"color": "black",
 				"size": "m",
-				"w": 757.2029816870042,
+				"w": 1011.75,
 				"font": "draw",
 				"textAlign": "start",
 				"autoSize": true,
-				"scale": 0.8296296390486352,
+				"scale": 1,
 				"richText": {
 					"type": "doc",
+					"attrs": {
+						"dir": "auto"
+					},
 					"content": [
 						{
 							"type": "paragraph",
@@ -99,7 +180,7 @@
 							"content": [
 								{
 									"type": "text",
-									"text": "├── app.py                      ← Flask backend (the code) "
+									"text": "├── backend/\r"
 								}
 							]
 						},
@@ -111,7 +192,7 @@
 							"content": [
 								{
 									"type": "text",
-									"text": "├── face_utils.py               ← Face embedding + hashing\r"
+									"text": "│   ├── app.py                  ← Main Server (Flask + Traffic Controller)\r"
 								}
 							]
 						},
@@ -123,7 +204,7 @@
 							"content": [
 								{
 									"type": "text",
-									"text": "├── requirements.txt\r"
+									"text": "│   ├── face_utils.py           ← AI Engine (Face Recognition & Encoding)\r"
 								}
 							]
 						},
@@ -135,7 +216,7 @@
 							"content": [
 								{
 									"type": "text",
-									"text": "├── index.html\r"
+									"text": "│   ├── eth_chain.py            ← Blockchain Handler (Talks to Ganache)\r"
 								}
 							]
 						},
@@ -147,7 +228,7 @@
 							"content": [
 								{
 									"type": "text",
-									"text": "├── upload.html\r"
+									"text": "│   ├── requirements.txt        ← List of Python Libraries\r"
 								}
 							]
 						},
@@ -159,7 +240,7 @@
 							"content": [
 								{
 									"type": "text",
-									"text": "├── authenticate.html\r"
+									"text": "│   │\r"
 								}
 							]
 						},
@@ -171,7 +252,7 @@
 							"content": [
 								{
 									"type": "text",
-									"text": "├── uploads/                    ← will auto-create when you run\r"
+									"text": "│   ├── data/                   ← Local Storage\r"
 								}
 							]
 						},
@@ -183,7 +264,139 @@
 							"content": [
 								{
 									"type": "text",
-									"text": "└── known_hashes.json           ← will auto-create after first registration\r"
+									"text": "│   │   ├── known_embeddings.json   ← User Database (RAM Cache)\r"
+								}
+							]
+						},
+						{
+							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
+							"content": [
+								{
+									"type": "text",
+									"text": "│   │   └── exam_schedule.json      ← Exam Dates Database\r"
+								}
+							]
+						},
+						{
+							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
+							"content": [
+								{
+									"type": "text",
+									"text": "│   │\r"
+								}
+							]
+						},
+						{
+							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
+							"content": [
+								{
+									"type": "text",
+									"text": "│   └── contracts/              ← Blockchain Logic\r"
+								}
+							]
+						},
+						{
+							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
+							"content": [
+								{
+									"type": "text",
+									"text": "│       ├── FaceAuth.sol            ← Smart Contract Source Code "
+								}
+							]
+						},
+						{
+							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
+							"content": [
+								{
+									"type": "text",
+									"text": "│       └── contract_address.txt    ← Saved Address of Deployed Contract\r"
+								}
+							]
+						},
+						{
+							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
+							"content": [
+								{
+									"type": "text",
+									"text": "│\r"
+								}
+							]
+						},
+						{
+							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
+							"content": [
+								{
+									"type": "text",
+									"text": "├── frontend/                   ← User Interfaces\r"
+								}
+							]
+						},
+						{
+							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
+							"content": [
+								{
+									"type": "text",
+									"text": "│   ├── index.html              ← Student Portal (Registration, Login, Exam)\r"
+								}
+							]
+						},
+						{
+							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
+							"content": [
+								{
+									"type": "text",
+									"text": "│   └── admin_dashboard.html    ← Admin Panel (Manage Users, Logs, Schedules)\r"
+								}
+							]
+						},
+						{
+							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
+							"content": [
+								{
+									"type": "text",
+									"text": "│\r"
+								}
+							]
+						},
+						{
+							"type": "paragraph",
+							"attrs": {
+								"dir": "auto"
+							},
+							"content": [
+								{
+									"type": "text",
+									"text": "└── start_project.bat           ← One-Click Launcher"
 								}
 							]
 						}
@@ -191,84 +404,8 @@
 				}
 			},
 			"parentId": "page:page",
-			"index": "a1Xp0KCV",
+			"index": "a1x4ZqHV",
 			"typeName": "shape"
-		},
-		{
-			"x": 0,
-			"y": 0,
-			"lastActivityTimestamp": 0,
-			"meta": {},
-			"id": "pointer:pointer",
-			"typeName": "pointer"
-		},
-		{
-			"followingUserId": null,
-			"opacityForNextShape": 1,
-			"stylesForNextShape": {},
-			"brush": null,
-			"scribbles": [],
-			"cursor": {
-				"type": "move",
-				"rotation": 0
-			},
-			"isFocusMode": false,
-			"exportBackground": true,
-			"isDebugMode": false,
-			"isToolLocked": false,
-			"screenBounds": {
-				"x": 0,
-				"y": 0,
-				"w": 1188,
-				"h": 469.6000061035156
-			},
-			"insets": [
-				false,
-				false,
-				true,
-				false
-			],
-			"zoomBrush": null,
-			"isGridMode": false,
-			"isPenMode": false,
-			"chatMessage": "",
-			"isChatting": false,
-			"highlightedUserIds": [],
-			"isFocused": true,
-			"devicePixelRatio": 1.25,
-			"isCoarsePointer": false,
-			"isHoveringCanvas": true,
-			"openMenus": [],
-			"isChangingStyle": false,
-			"isReadonly": false,
-			"meta": {},
-			"duplicateProps": null,
-			"id": "instance:instance",
-			"currentPageId": "page:page",
-			"typeName": "instance"
-		},
-		{
-			"editingShapeId": null,
-			"croppingShapeId": null,
-			"selectedShapeIds": [
-				"shape:qCFO6C0gT7X6dxhfU0ZHZ"
-			],
-			"hoveredShapeId": null,
-			"erasingShapeIds": [],
-			"hintingShapeIds": [],
-			"focusedGroupId": null,
-			"meta": {},
-			"id": "instance_page_state:page:page",
-			"pageId": "page:page",
-			"typeName": "instance_page_state"
-		},
-		{
-			"x": 7090.664066696592,
-			"y": 3383.657966663961,
-			"z": 1,
-			"meta": {},
-			"id": "camera:page:page",
-			"typeName": "camera"
 		}
 	]
 }

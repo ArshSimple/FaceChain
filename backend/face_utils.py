@@ -1,126 +1,92 @@
 import face_recognition
-import cv2
+import dlib
 import numpy as np
 import json
 import os
 import base64
+import cv2
 
-# File to store user data (simulated DB)
-EMBEDDINGS_FILE = "known_embeddings.json"
+# --- CONFIGURATION ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODELS_DIR = os.path.join(BASE_DIR, "models")
+DATA_DIR = os.path.join(BASE_DIR, "data")
+
+SHAPE_PREDICTOR_PATH = os.path.join(MODELS_DIR, "shape_predictor_68_face_landmarks.dat")
+RECOGNITION_MODEL_PATH = os.path.join(MODELS_DIR, "dlib_face_recognition_resnet_model_v1.dat")
+EMBEDDINGS_FILE = os.path.join(DATA_DIR, "known_embeddings.json")
+
+# --- GLOBAL MODEL LOADING (Loads once for speed) ---
+print("⏳ Loading AI Models...")
+detector = dlib.get_frontal_face_detector()
+try:
+    predictor = dlib.shape_predictor(SHAPE_PREDICTOR_PATH)
+    face_rec_model = dlib.face_recognition_model_v1(RECOGNITION_MODEL_PATH)
+    print("✅ AI Models Loaded.")
+except RuntimeError:
+    print(f"❌ ERROR: Models not found in {MODELS_DIR}")
+    print("Please move .dat files to backend/models/")
+    exit(1)
 
 def load_embeddings():
-    """
-    Loads user data and converts face encodings from JSON Lists back to NumPy Arrays.
-    """
     if not os.path.exists(EMBEDDINGS_FILE):
         return {}
-
     try:
-        with open(EMBEDDINGS_FILE, "r") as f:
-            data = json.load(f)
-            
-        # ⚡ CRITICAL FIX: Convert Lists back to Numpy Arrays for the AI ⚡
-        for user_id, user_data in data.items():
-            if 'encoding' in user_data:
-                user_data['encoding'] = np.array(user_data['encoding'])
-                
-        return data
-    except Exception as e:
-        print(f"⚠️ Error loading DB: {e}")
+        with open(EMBEDDINGS_FILE, 'r') as f:
+            return json.load(f)
+    except json.JSONDecodeError:
         return {}
 
-def save_embedding(user_id, encoding, mfa_secret, role="user", name="Unknown"):
-    """
-    Saves a new user. auto-converts Numpy Array to List for JSON safety.
-    """
+def save_embedding(user_id, encoding, mfa_secret, role, name, roll_no, exam_subjects):
     data = load_embeddings()
-    
-    # ⚡ CRITICAL FIX: Ensure we save as a List, not Numpy ⚡
-    if hasattr(encoding, 'tolist'):
-        encoding_to_save = encoding.tolist()
-    else:
-        encoding_to_save = encoding
-
-    data[str(user_id)] = {
-        "name": name,
-        "role": role,
+    data[user_id] = {
+        "encoding": encoding,
         "mfa_secret": mfa_secret,
-        "mfa_enabled": True,
-        "encoding": encoding_to_save  # Saved as clean List
+        "role": role,
+        "name": name,
+        "roll_no": roll_no,
+        "exam_subjects": exam_subjects,
+        "mfa_enabled": True
     }
-
-    try:
-        # Note: We must convert ALL arrays in 'data' to lists before dumping
-        # (Because load_embeddings converts them to arrays, we need to reverse it for dump)
-        data_for_json = {}
-        for uid, udata in data.items():
-            entry = udata.copy()
-            if isinstance(entry['encoding'], np.ndarray):
-                entry['encoding'] = entry['encoding'].tolist()
-            data_for_json[uid] = entry
-
-        with open(EMBEDDINGS_FILE, "w") as f:
-            json.dump(data_for_json, f, indent=4)
-            
-        print(f"✅ User {name} (ID: {user_id}) saved locally.")
-    except Exception as e:
-        print(f"❌ Failed to save user: {e}")
+    with open(EMBEDDINGS_FILE, 'w') as f:
+        json.dump(data, f, indent=4)
 
 def decode_image(base64_string):
-    """
-    Decodes a Base64 string from the frontend into an OpenCV image.
-    """
     try:
-        if "," in base64_string:
+        if "base64," in base64_string:
             base64_string = base64_string.split(",")[1]
-        
         img_data = base64.b64decode(base64_string)
         np_arr = np.frombuffer(img_data, np.uint8)
         img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        
-        # Convert BGR (OpenCV) to RGB (Face_Recognition)
         return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    except Exception as e:
-        print(f"Image decode error: {e}")
+    except Exception:
         return None
 
-def get_face_embedding(image_rgb):
-    """
-    Detects face and returns the 128-d encoding.
-    """
-    try:
-        # Detect faces
-        face_locations = face_recognition.face_locations(image_rgb)
-        if not face_locations:
-            return None
-        
-        # Encode the first face found
-        encodings = face_recognition.face_encodings(image_rgb, face_locations)
-        if encodings:
-            return encodings[0] # Returns a Numpy Array
-    except Exception as e:
-        print(f"Embedding error: {e}")
-    return None
-
-def find_match(live_encoding, tolerance=0.45):
-    """
-    Compares live face with all stored faces.
-    Lower tolerance = Stricter match.
-    """
-    data = load_embeddings()
+def get_face_embedding(image):
+    # Detect faces
+    faces = detector(image, 1)
+    if len(faces) != 1:
+        return None  # Ensure exactly one face
     
-    # Convert live_encoding to numpy if it isn't already
-    if isinstance(live_encoding, list):
-        live_encoding = np.array(live_encoding)
+    # Get shape and encoding
+    shape = predictor(image, faces[0])
+    face_descriptor = face_rec_model.compute_face_descriptor(image, shape)
+    return np.array(face_descriptor)
 
-    for user_id, user_data in data.items():
-        stored_encoding = user_data['encoding']
-        
-        # Calculate Distance (Math happens here)
-        # ⚡ Both must be Numpy Arrays for this to work ⚡
-        distance = face_recognition.face_distance([stored_encoding], live_encoding)[0]
-        
-        if distance < tolerance:
-            return user_id, user_data
-            
+def find_match(encoding, tolerance=0.45): # Stricter tolerance for security
+    data = load_embeddings()
+    # Compare against all known faces
+    known_encodings = [np.array(v['encoding']) for v in data.values()]
+    user_ids = list(data.keys())
+    
+    if not known_encodings:
+        return None, None
+
+    # Calculate distances
+    distances = np.linalg.norm(known_encodings - encoding, axis=1)
+    min_dist_idx = np.argmin(distances)
+    
+    if distances[min_dist_idx] < tolerance:
+        matched_id = user_ids[min_dist_idx]
+        return matched_id, data[matched_id]
+    
     return None, None

@@ -1,179 +1,182 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FaceChain | Admin SOC</title>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    :root { font-family: 'Plus Jakarta Sans', sans-serif; }
-    body { 
-        background-color: #020617; 
-        background-image: radial-gradient(at 0% 0%, #0f172a 0px, transparent 50%), 
-                          radial-gradient(at 100% 100%, #1e1b4b 0px, transparent 50%);
-        color: #f8fafc;
-        overflow: hidden; /* FIXED: Added the missing colon here */
-    }
-    .glass { 
-        background: rgba(15, 23, 42, 0.6); 
-        backdrop-filter: blur(12px); 
-        border: 1px solid rgba(255, 255, 255, 0.08); 
-    }
-    .sidebar-link:hover { background: rgba(56, 189, 248, 0.1); color: #38bdf8; }
-    .active-link { background: rgba(56, 189, 248, 0.15); color: #38bdf8; border-right: 3px solid #38bdf8; }
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-  </style>
+    <meta charset="UTF-8">
+    <title>FaceChain Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #0f172a; color: #cbd5e1; font-family: monospace; }
+        .glass { background: rgba(30,41,59,0.7); border:1px solid rgba(148,163,184,0.1); backdrop-filter:blur(10px); }
+        ::-webkit-scrollbar { width:8px; } ::-webkit-scrollbar-thumb { background:#334155; }
+    </style>
 </head>
-<body class="h-screen flex">
+<body class="h-screen flex overflow-hidden">
+    <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col p-4">
+        <h1 class="text-2xl font-bold text-white mb-8">FACE<span class="text-blue-500">CHAIN</span></h1>
+        
+        <nav class="space-y-2 mb-auto">
+            <div class="px-4 py-2 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20 text-xs font-bold">DASHBOARD</div>
+        </nav>
 
-  <aside class="w-64 border-r border-slate-800 bg-slate-900/50 flex flex-col">
-    <div class="p-8">
-        <h1 class="text-xl font-extrabold tracking-tighter flex items-center gap-2">
-            <div class="w-6 h-6 bg-cyan-500 rounded-lg"></div>
-            FACE<span class="text-cyan-400">CHAIN</span>
-        </h1>
-        <p class="text-[10px] text-slate-500 font-bold mt-1 tracking-widest uppercase">Blockchain SOC</p>
-    </div>
+        <button onclick="logout()" class="w-full py-2 bg-red-900/20 text-red-400 border border-red-900/30 rounded text-xs font-bold hover:bg-red-900/40">LOGOUT</button>
+    </aside>
 
-    <nav class="flex-1 px-4 space-y-2">
-        <a href="index.html" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all group">
-            <svg class="w-5 h-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-            Home
-        </a>
-        <a href="upload.html" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all group">
-            <svg class="w-5 h-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
-            Register Identity
-        </a>
-        <a href="authenticate.html" class="sidebar-link flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all group">
-            <svg class="w-5 h-5 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-            Auth Check
-        </a>
-        <div class="active-link flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium">
-            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-            Admin SOC
-        </div>
-    </nav>
+    <main class="flex-1 flex flex-col">
+        <header class="h-16 border-b border-slate-800 flex items-center justify-between px-8 bg-slate-900">
+            <div class="text-xs font-bold text-emerald-500">● SYSTEM ONLINE</div>
+            <button onclick="loadData()" class="text-xs bg-slate-800 text-white px-3 py-1 rounded border border-slate-600 hover:bg-slate-700">REFRESH DATA</button>
+        </header>
 
-    <div class="p-4 border-t border-slate-800">
-        <button onclick="logout()" class="w-full bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white p-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2">
-            LOGOUT
-        </button>
-    </div>
-  </aside>
-
-  <main class="flex-1 flex flex-col overflow-hidden">
-    <header class="h-16 border-b border-slate-800 flex items-center justify-between px-8 bg-slate-900/40">
-        <div id="sync-status" class="flex items-center gap-2 text-[10px] font-bold text-green-500 bg-green-500/10 px-3 py-1 rounded-full">
-            <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
-            NODE: SYNCED
-        </div>
-        <div class="text-xs text-slate-500 font-mono">Blockchain Address: <span id="contract-addr" class="text-cyan-700">--</span></div>
-    </header>
-
-    <div class="flex-1 overflow-y-auto p-8 space-y-6">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div class="glass p-6 rounded-3xl">
-                <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest">Identities</p>
-                <h2 id="totalUsers" class="text-3xl font-bold mt-1">0</h2>
-            </div>
-            <div class="glass p-6 rounded-3xl">
-                <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest">Transactions</p>
-                <h2 id="totalBlocks" class="text-3xl font-bold mt-1 text-cyan-400">0</h2>
-            </div>
-            <div class="glass p-6 rounded-3xl">
-                <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest">Network Status</p>
-                <h2 class="text-3xl font-bold mt-1 text-emerald-500">Active</h2>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            <div class="glass rounded-3xl p-6 flex flex-col h-[500px] lg:col-span-1">
-                <input type="text" id="userSearch" placeholder="Search identities..." class="w-full bg-slate-900/50 border border-slate-700 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-cyan-500 mb-4">
-                <div id="userList" class="space-y-2 overflow-y-auto pr-2"></div>
-            </div>
-
-            <div class="glass rounded-3xl lg:col-span-3 flex flex-col h-[500px] overflow-hidden">
-                <div class="p-6 border-b border-slate-800 flex justify-between items-center">
-                    <h3 class="font-bold text-sm uppercase tracking-widest text-slate-400">Immutable Activity Ledger</h3>
-                    <button onclick="loadData()" class="text-[10px] font-bold bg-slate-800 px-3 py-1 rounded-lg hover:bg-slate-700 transition-all">REFRESH</button>
+        <div class="flex-1 overflow-y-auto p-8 space-y-6">
+            
+            <div class="glass p-6 rounded">
+                <h3 class="font-bold text-white mb-4">📅 Scheduler</h3>
+                <div class="flex gap-4 mb-4">
+                    <select id="sched-subject" class="bg-slate-950 border border-slate-700 text-white p-2 rounded w-1/3 text-xs">
+                        <option>Network Security</option><option>Blockchain</option><option>AI/ML</option>
+                    </select>
+                    <input type="date" id="sched-date" class="bg-slate-950 border border-slate-700 text-white p-2 rounded w-1/3 text-xs">
+                    <button onclick="setSchedule()" class="bg-blue-600 text-white px-6 rounded font-bold text-xs">Set Schedule</button>
                 </div>
-                <div class="overflow-auto flex-1">
-                    <table class="w-full text-left">
-                        <thead class="bg-slate-900/80 text-[10px] text-slate-500 uppercase font-black sticky top-0">
+                <div id="schedule-list" class="space-y-2"></div>
+            </div>
+
+            <div class="glass p-6 rounded h-[500px] flex flex-col">
+                <div class="flex justify-between mb-4">
+                    <h3 class="font-bold text-white">🎓 Students Registry</h3>
+                    <input type="text" id="userSearch" onkeyup="filterUsers()" placeholder="Search Name/Roll..." class="bg-slate-950 border border-slate-700 text-white px-2 rounded text-xs w-64">
+                </div>
+                <div class="overflow-y-auto">
+                    <table class="w-full text-left text-sm">
+                        <thead class="bg-slate-900 text-slate-500 text-xs uppercase sticky top-0">
                             <tr>
-                                <th class="px-6 py-4">Timestamp</th>
-                                <th class="px-6 py-4">Activity</th>
-                                <th class="px-6 py-4">Identity</th>
-                                <th class="px-6 py-4">Status</th>
-                                <th class="px-6 py-4 text-right">Hash</th>
+                                <th class="p-3">Name</th>
+                                <th class="p-3">Roll No</th>
+                                <th class="p-3">Exam Status</th>
+                                <th class="p-3">MFA Control</th> <th class="p-3 text-right">Action</th>
                             </tr>
                         </thead>
-                        <tbody id="logTable" class="text-[11px] font-mono divide-y divide-slate-800/40"></tbody>
+                        <tbody id="userTableBody" class="divide-y divide-slate-800"></tbody>
                     </table>
                 </div>
             </div>
-        </div>
-    </div>
-  </main>
-
-  <script>
-    let allUsers = [];
-
-    async function loadData() {
-        try {
-            const res = await fetch(`http://127.0.0.1:5000/admin/stats?t=${Date.now()}`, { credentials: 'include' });
-            if (res.status === 401) { window.location.href = "authenticate.html"; return; }
             
-            const data = await res.json();
-            allUsers = data.user_list || [];
-            
-            document.getElementById("totalUsers").innerText = data.total_users;
-            document.getElementById("totalBlocks").innerText = data.logs.length;
-            
-            renderUserList(allUsers);
-
-            const logTable = document.getElementById('logTable');
-            logTable.innerHTML = data.logs.map(log => {
-                const date = new Date(log.timestamp * 1000).toLocaleTimeString();
-                const color = log.status === 'SUCCESS' ? 'text-emerald-400' : 'text-red-400';
-                return `
-                    <tr class="hover:bg-slate-800/40">
-                        <td class="px-6 py-4 text-slate-500">${date}</td>
-                        <td class="px-6 py-4 font-bold text-slate-200">${log.action}</td>
-                        <td class="px-6 py-4 text-cyan-400">#${log.user_id}</td>
-                        <td class="px-6 py-4"><span class="${color} font-black">${log.status}</span></td>
-                        <td class="px-6 py-4 text-right text-slate-600">${log.hash_short}</td>
-                    </tr>`;
-            }).join('');
-        } catch (e) { console.error(e); }
-    }
-
-    function renderUserList(users) {
-        const userList = document.getElementById('userList');
-        userList.innerHTML = users.map(u => `
-            <div class="p-3 rounded-xl bg-slate-800/30 border border-slate-700/50 flex flex-col">
-                <span class="text-xs font-bold text-white">${u.name}</span>
-                <span class="text-[9px] text-slate-500 font-mono">ID: ${u.id}</span>
+            <div class="glass p-6 rounded">
+                <h3 class="font-bold text-white mb-2">🛡️ Security Logs</h3>
+                <div id="logs-container" class="bg-black h-48 overflow-y-auto p-4 text-xs font-mono text-slate-500"></div>
             </div>
-        `).join('');
-    }
+        </div>
+    </main>
 
-    // Live Search Logic
-    document.getElementById('userSearch').addEventListener('input', (e) => {
-        const term = e.target.value.toLowerCase();
-        const filtered = allUsers.filter(u => u.name.toLowerCase().includes(term) || u.id.toString().includes(term));
-        renderUserList(filtered);
-    });
+    <script>
+        let allUsers = [];
 
-    async function logout() {
-        await fetch('http://127.0.0.1:5000/logout', { credentials: 'include' });
-        window.location.href = "index.html";
-    }
+        async function loadData() {
+            try {
+                let res = await fetch(`/admin/stats?t=${Date.now()}`);
+                if(res.status===401) return window.location.href="index.html";
+                let data = await res.json();
+                allUsers = data.user_list||[];
+                renderUsers(allUsers);
+                renderSchedule(data.schedule);
+                renderLogs(data.logs);
+            } catch(e){}
+        }
 
-    window.onload = loadData;
-    setInterval(loadData, 10000);
-  </script>
+        function renderUsers(users) {
+            document.getElementById('userTableBody').innerHTML = users.map(u => {
+                // Exam Status Badges
+                let status = u.exam_subjects.map(s => {
+                    let verified = u.exams_verified && u.exams_verified.includes(s);
+                    let color = verified ? "bg-blue-500/10 text-blue-400 border-blue-500/30" : "bg-slate-800 text-slate-500 border-slate-700";
+                    let icon = verified ? "✓" : "○";
+                    return `<span class="px-2 py-1 text-[10px] border rounded mr-1 ${color}">${s} ${icon}</span>`;
+                }).join('');
+
+                // MFA Button Style
+                let mfaClass = u.mfa_enabled 
+                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
+                    : "bg-slate-700 text-slate-400 border-slate-600";
+                let mfaText = u.mfa_enabled ? "ENABLED" : "DISABLED";
+
+                return `
+                <tr class="hover:bg-slate-800/50">
+                    <td class="p-3 font-bold text-white">${u.name}</td>
+                    <td class="p-3 font-mono text-blue-400">${u.roll_no}</td>
+                    <td class="p-3">${status || '<span class="text-slate-600">No Exams</span>'}</td>
+                    
+                    <td class="p-3">
+                        <button onclick="toggleMFA('${u.id}')" class="text-[10px] font-bold px-2 py-1 rounded border ${mfaClass}">
+                            ${mfaText}
+                        </button>
+                    </td>
+
+                    <td class="p-3 text-right">
+                        ${u.id!=='1' ? `<button onclick="deleteUser('${u.id}')" class="text-xs text-red-400 bg-red-900/20 px-2 py-1 rounded hover:bg-red-900/40 border border-red-900/30">DELETE</button>` : '<span class="text-xs text-slate-600">Admin</span>'}
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function renderSchedule(sched) {
+            let html = "";
+            for(let [s,d] of Object.entries(sched)) {
+                html += `
+                <div class="flex justify-between items-center bg-slate-900 p-2 rounded border border-slate-800">
+                    <span class="text-white text-sm font-bold">${s}</span>
+                    <span class="text-emerald-400 font-mono text-xs">${d}</span>
+                    <button onclick="delSchedule('${s}')" class="text-red-500 text-xs hover:text-white">x</button>
+                </div>`;
+            }
+            document.getElementById('schedule-list').innerHTML = html;
+        }
+
+        function renderLogs(logs) {
+            document.getElementById('logs-container').innerHTML = logs.map(l => 
+                `<div class="mb-1 border-b border-slate-900 pb-1">
+                    <span class="text-slate-600">[${l.timestamp}]</span> 
+                    <span class="${l.status==='SUCCESS'||l.status==='VERIFIED'?'text-emerald-400':'text-red-400'}">${l.action} : ${l.status}</span> 
+                    <span class="text-slate-500">(${l.user_id})</span>
+                </div>`
+            ).join('');
+        }
+
+        async function setSchedule() {
+            let s = document.getElementById('sched-subject').value;
+            let d = document.getElementById('sched-date').value;
+            if(!d) return;
+            await fetch('/admin/set_schedule', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({subject:s, date:d})});
+            loadData();
+        }
+
+        async function delSchedule(s) {
+            if(confirm('Delete Schedule?')) {
+                await fetch('/admin/delete_schedule', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({subject:s})});
+                loadData();
+            }
+        }
+
+        async function deleteUser(id) {
+            if(confirm('Delete User?')) {
+                await fetch('/admin/delete_user', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id:id})});
+                loadData();
+            }
+        }
+
+        async function toggleMFA(id) {
+            await fetch('/admin/toggle_mfa', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id:id})});
+            loadData();
+        }
+
+        function filterUsers() {
+            let t = document.getElementById('userSearch').value.toLowerCase();
+            renderUsers(allUsers.filter(u => u.name.toLowerCase().includes(t) || u.roll_no.toLowerCase().includes(t)));
+        }
+
+        async function logout() { await fetch('/logout'); window.location.href="index.html"; }
+        
+        loadData();
+        setInterval(loadData, 5000);
+    </script>
 </body>
 </html>

@@ -1,232 +1,260 @@
+# --- 1. SILENCE WARNINGS (MUST BE FIRST) ---
+import warnings
+import os
+import logging
+
+# Filter specific "pkg_resources" warning
+warnings.filterwarnings("ignore", category=UserWarning, message=".*pkg_resources is deprecated.*")
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+# Silence Flask's startup logs safely
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
+
+# --- 2. STANDARD IMPORTS ---
 from flask import Flask, request, jsonify, session, send_from_directory
 from flask_cors import CORS
 import pyotp
 import face_utils
-# Using the Ethereum Bridge
 from eth_chain import eth_ledger as ledger
-import os
-import re
 import json
-import numpy as np  # Added to handle array checks
+import numpy as np
+import webbrowser
+from threading import Timer
+from datetime import datetime
 
-# Configuration for finding frontend files
-FRONTEND_FOLDER = os.path.abspath("../frontend")
+# --- PATH CONFIGURATION ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FRONTEND_FOLDER = os.path.join(os.path.dirname(BASE_DIR), "frontend")
+DATA_DIR = os.path.join(BASE_DIR, "data")
+SCHEDULE_FILE = os.path.join(DATA_DIR, "exam_schedule.json")
+
 app = Flask(__name__, static_folder=FRONTEND_FOLDER)
-app.secret_key = 'super_secret_facechain_key'
+app.secret_key = 'RESET_SESSION_KEY_999' 
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = False 
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
-# Allow CORS for all domains
-CORS(app, resources={r"/*": {"origins": re.compile(r"^.*$")}}, supports_credentials=True)
+# --- GLOBAL CACHE ---
+print("🚀 Loading User Database...")
+USER_DB_CACHE = face_utils.load_embeddings()
+print(f"✅ Database Loaded: {len(USER_DB_CACHE)} users.")
 
-# --- ROUTE: SERVE FRONTEND ---
+def load_schedule():
+    if not os.path.exists(SCHEDULE_FILE): return {}
+    with open(SCHEDULE_FILE, 'r') as f: return json.load(f)
+
+def save_schedule(data):
+    with open(SCHEDULE_FILE, 'w') as f: json.dump(data, f, indent=4)
+
+def save_all_users():
+    with open(face_utils.EMBEDDINGS_FILE, 'w') as f:
+        json.dump(USER_DB_CACHE, f, indent=4)
+
 @app.route('/')
-def serve_index(): 
-    return send_from_directory(FRONTEND_FOLDER, 'index.html')
+def serve_index(): return send_from_directory(FRONTEND_FOLDER, 'index.html')
 
 @app.route('/<path:filename>')
-def serve_static(filename): 
-    return send_from_directory(FRONTEND_FOLDER, filename)
+def serve_static(filename): return send_from_directory(FRONTEND_FOLDER, filename)
 
-# --- ROUTE: REGISTER ---
+# --- AUTHENTICATION & REGISTER ---
+
 @app.route('/register', methods=['POST'])
 def register():
     try:
         data = request.json
         user_id = data.get('user_id')
-        name = data.get('name') or "Unknown"
-        image_b64 = data.get('image')
+        name = data.get('name')
+        
+        if not user_id or not data.get('image'): return jsonify({"error": "Missing Data"}), 400
 
-        if not user_id or not image_b64: 
-            return jsonify({"error": "Missing Data"}), 400
-
-        # 1. Decode Image
-        img_rgb = face_utils.decode_image(image_b64)
-        if img_rgb is None: 
-            return jsonify({"error": "Image Decode Failed"}), 400
-
-        # 2. Get Face Embedding
+        img_rgb = face_utils.decode_image(data.get('image'))
+        if img_rgb is None: return jsonify({"error": "Image Decode Failed"}), 400
+        
         encoding = face_utils.get_face_embedding(img_rgb)
-        if encoding is None: 
-            return jsonify({"error": "No face detected"}), 400
+        if encoding is None: return jsonify({"error": "No face detected"}), 400
+        if hasattr(encoding, 'tolist'): encoding = encoding.tolist()
 
-        # ⚡ FIX: Convert Numpy Array to List for JSON Serialization ⚡
-        if hasattr(encoding, 'tolist'):
-            encoding = encoding.tolist()
+        if user_id in USER_DB_CACHE:
+            return jsonify({"error": "User ID already exists"}), 400
 
-        # 3. Check for Duplicates (Local Check)
-        # Note: We convert back to array if find_match expects it, but usually lists work fine for comparison checks
-        existing_id, _ = face_utils.find_match(np.array(encoding))
-        if existing_id: 
-            return jsonify({"error": f"Face already registered as {existing_id}"}), 400
-
-        # 4. Generate MFA
         mfa_secret = pyotp.random_base32()
-        uri = pyotp.totp.TOTP(mfa_secret).provisioning_uri(name=str(user_id), issuer_name="FaceChain")
-        role = "admin" if str(user_id) == "1" else "user"
+        uri = pyotp.totp.TOTP(mfa_secret).provisioning_uri(name=f"{name} ({user_id})", issuer_name="FaceChain Exam")
+        role = "admin" if str(user_id) == "1" else "student"
         
-        # 5. Save to Local Database (For Backup/Fast Match)
-        # Now passing a LIST, so json.dump won't crash
-        face_utils.save_embedding(user_id, encoding, mfa_secret, role, name)
-        
-        # 6. REGISTER ON BLOCKCHAIN (The New Step)
-        success = ledger.register_user(user_id, encoding)
-        
-        if success:
-            ledger.add_log(user_id, f"REGISTER: {name}", "SUCCESS", request.remote_addr)
-            return jsonify({"message": "Registered On-Chain", "mfa_uri": uri})
-        else:
-            return jsonify({"error": "Blockchain Registration Failed"}), 500
+        new_user = {
+            "encoding": encoding,
+            "mfa_secret": mfa_secret,
+            "role": role,
+            "name": name,
+            "roll_no": data.get('roll_no'),
+            "exam_subjects": data.get('exam_subjects') or [],
+            "mfa_enabled": True,
+            "exams_verified": [] 
+        }
 
+        USER_DB_CACHE[user_id] = new_user
+        save_all_users()
+
+        ledger.register_user(user_id, encoding)
+        ledger.add_log(user_id, f"REGISTER: {name}", "SUCCESS", request.remote_addr)
+        
+        return jsonify({"message": "Registered", "mfa_uri": uri})
     except Exception as e:
-        print(f"Server Error: {e}")
         return jsonify({"error": str(e)}), 500
 
-# --- ROUTE: AUTHENTICATE (STEP 1) ---
 @app.route('/authenticate', methods=['POST'])
 def authenticate():
     data = request.json
-    image_b64 = data.get('image')
-    img_rgb = face_utils.decode_image(image_b64)
+    user_id_input = data.get('user_id')
+    
+    if user_id_input not in USER_DB_CACHE:
+        ledger.add_log(user_id_input, "LOGIN_ATTEMPT", "USER_NOT_FOUND", request.remote_addr)
+        return jsonify({"match": False, "error": "User not found"}), 200
+
+    img_rgb = face_utils.decode_image(data.get('image'))
     if img_rgb is None: return jsonify({"match": False}), 400
     
     encoding = face_utils.get_face_embedding(img_rgb)
-    if encoding is None: return jsonify({"match": False}), 200
+    if encoding is None: 
+        ledger.add_log(user_id_input, "LOGIN_ATTEMPT", "NO_FACE", request.remote_addr)
+        return jsonify({"match": False}), 200
 
-    # Find match locally first to get the User ID
-    # We pass the raw numpy array here because dlib/face_recognition expects it for math
-    user_id, user_data = face_utils.find_match(encoding)
-
-    if user_id:
-        # OPTIONAL: Perform On-Chain Verification here
-        # We convert to list() because Blockchain functions need clean numbers, not numpy objects
-        ledger.verify_user(user_id, encoding.tolist())
-
-        return jsonify({
-            "match": True, 
-            "user_id": user_id, 
-            "name": user_data.get('name', 'User')
-        })
+    matched_id, user_data = face_utils.find_match(encoding)
     
-    return jsonify({"match": False})
+    if matched_id and matched_id == user_id_input:
+        ledger.verify_user(matched_id, encoding.tolist())
+        return jsonify({
+            "match": True, "user_id": matched_id, 
+            "name": user_data.get('name'), "mfa_required": user_data.get('mfa_enabled', True) 
+        })
+    else:
+        ledger.add_log(user_id_input, "LOGIN_ATTEMPT", "FACE_MISMATCH", request.remote_addr)
+        return jsonify({"match": False})
 
-# --- ROUTE: VERIFY MFA (STEP 2 - LOGIN) ---
 @app.route('/verify-mfa', methods=['POST'])
 def verify_mfa():
     data = request.json
     user_id = data.get('user_id')
     code = data.get('code')
+    user = USER_DB_CACHE.get(user_id)
+    
+    if not user: return jsonify({"success": False}), 400
+    if str(user_id) == "1": user['role'] = 'admin'
 
-    db = face_utils.load_embeddings()
-    user = db.get(user_id)
-
-    if not user: 
-        return jsonify({"success": False, "message": "User not found"}), 400
-
-    # Check if MFA is globally enabled for this user
-    if user.get('mfa_enabled', True) == False:
-         session['user_id'] = user_id
-         session['role'] = user['role']
-         session['logged_in'] = True
-         ledger.add_log(user_id, "LOGIN_NO_MFA", "SUCCESS", request.remote_addr)
-         return jsonify({"success": True, "role": user['role']})
-
-    # Verify TOTP Code
-    totp = pyotp.TOTP(user['mfa_secret'])
-    if totp.verify(code):
+    if pyotp.TOTP(user['mfa_secret']).verify(code) or user.get('mfa_enabled', True) == False:
         session['user_id'] = user_id
         session['role'] = user['role']
         session['logged_in'] = True
-        
-        ledger.add_log(user_id, "LOGIN_MFA", "SUCCESS", request.remote_addr)
-        return jsonify({"success": True, "role": user['role']})
+        ledger.add_log(user_id, "LOGIN", "SUCCESS", request.remote_addr)
+        return jsonify({
+            "success": True, "role": user['role'], 
+            "exam_subjects": user.get('exam_subjects', []), 
+            "schedule": load_schedule()
+        })
     
-    ledger.add_log(user_id, "LOGIN_MFA", "FAILED", request.remote_addr)
+    ledger.add_log(user_id, "MFA_VERIFY", "FAILED", request.remote_addr)
     return jsonify({"success": False, "message": "Invalid Code"})
 
-# --- ROUTE: ADMIN DASHBOARD DATA ---
+@app.route('/mark_exam_verified', methods=['POST'])
+def mark_exam_verified():
+    if not session.get('logged_in'): return jsonify({"error": "Unauthorized"}), 401
+    data = request.json
+    user_id = session.get('user_id')
+    subject = data.get('subject')
+    
+    if user_id in USER_DB_CACHE:
+        if 'exams_verified' not in USER_DB_CACHE[user_id]:
+            USER_DB_CACHE[user_id]['exams_verified'] = []
+            
+        record_entry = f"{subject}"
+        
+        if record_entry not in USER_DB_CACHE[user_id]['exams_verified']:
+            USER_DB_CACHE[user_id]['exams_verified'].append(record_entry)
+            save_all_users()
+            ledger.add_log(user_id, f"EXAM_START: {subject}", "VERIFIED", request.remote_addr)
+            
+        return jsonify({"success": True})
+    return jsonify({"error": "User not found"}), 404
+
+# --- ADMIN ROUTES ---
+
 @app.route('/admin/stats', methods=['GET'])
 def admin_stats():
-    if not session.get('logged_in') or session.get('role') != 'admin':
-         return jsonify({"error": "Unauthorized"}), 401
-    
-    db = face_utils.load_embeddings()
-    
-    # FETCH LOGS FROM ETHEREUM SMART CONTRACT
-    logs = ledger.get_logs()
-    
-    # Convert DB to list for frontend
-    user_list = []
-    for k, v in db.items():
-        user_list.append({
-            "id": k, 
-            "name": v.get("name", "Unknown"),
-            "mfa_enabled": v.get("mfa_enabled", True)
-        })
-
-    return jsonify({"total_users": len(db), "user_list": user_list, "logs": logs})
-
-# --- ROUTE: DELETE USER ---
-@app.route('/admin/delete_user', methods=['POST'])
-def delete_user():
     if not session.get('logged_in') or session.get('role') != 'admin': 
         return jsonify({"error": "Unauthorized"}), 401
-    
-    user_to_delete = request.json.get('user_id')
-    
-    if str(user_to_delete) == "1":
-        return jsonify({"error": "Cannot delete the Super Admin!"}), 403
 
-    db = face_utils.load_embeddings()
-    if user_to_delete in db:
-        deleted_name = db[user_to_delete].get('name', 'Unknown')
-        
-        del db[user_to_delete]
-        with open(face_utils.EMBEDDINGS_FILE, 'w') as f: 
-            json.dump(db, f)
-        
-        ledger.add_log(session['user_id'], f"DELETE: {deleted_name} (ID: {user_to_delete})", "SUCCESS", request.remote_addr)
-        return jsonify({"message": "User deleted"})
+    user_list = []
+    for k, v in USER_DB_CACHE.items():
+        user_list.append({
+            "id": k, 
+            "name": v.get("name"), 
+            "roll_no": v.get("roll_no"), 
+            "exam_subjects": v.get("exam_subjects", []),
+            "exams_verified": v.get("exams_verified", []),
+            "mfa_enabled": v.get("mfa_enabled", True)
+        })
     
-    return jsonify({"error": "User not found"}), 404
+    return jsonify({
+        "total_users": len(USER_DB_CACHE), 
+        "user_list": user_list, 
+        "logs": ledger.get_logs(), 
+        "schedule": load_schedule()
+    })
 
-# --- ROUTE: TOGGLE MFA ---
+@app.route('/admin/set_schedule', methods=['POST'])
+def set_schedule():
+    if session.get('role') != 'admin': return jsonify({"error": "Unauthorized"}), 401
+    data = request.json
+    schedule = load_schedule()
+    schedule[data.get('subject')] = data.get('date')
+    save_schedule(schedule)
+    return jsonify({"success": True})
+
+@app.route('/admin/delete_schedule', methods=['POST'])
+def delete_schedule():
+    if session.get('role') != 'admin': return jsonify({"error": "Unauthorized"}), 401
+    data = request.json
+    subject = data.get('subject')
+    schedule = load_schedule()
+    if subject in schedule:
+        del schedule[subject]
+        save_schedule(schedule)
+        return jsonify({"success": True})
+    return jsonify({"error": "Subject not found"}), 404
+
 @app.route('/admin/toggle_mfa', methods=['POST'])
 def toggle_mfa():
-    if not session.get('logged_in') or session.get('role') != 'admin':
-        return jsonify({"error": "Unauthorized"}), 401
-    
-    data = request.json
-    user_id = data.get('user_id')
-    
-    db = face_utils.load_embeddings()
-    if user_id in db:
-        # Toggle Status
-        current_status = db[user_id].get('mfa_enabled', True)
-        new_status = not current_status
-        db[user_id]['mfa_enabled'] = new_status
-        
-        with open(face_utils.EMBEDDINGS_FILE, 'w') as f:
-            json.dump(db, f)
-            
-        status_text = "ENABLED" if new_status else "DISABLED"
-        ledger.add_log(session['user_id'], f"MFA_CHANGE: User {user_id} set to {status_text}", "SUCCESS", request.remote_addr)
-        
-        return jsonify({"success": True, "new_status": new_status})
-    
-    return jsonify({"error": "User not found"}), 404
+    if session.get('role') != 'admin': return jsonify({"error": "Unauthorized"}), 401
+    user_id = request.json.get('user_id')
+    if user_id in USER_DB_CACHE:
+        USER_DB_CACHE[user_id]['mfa_enabled'] = not USER_DB_CACHE[user_id].get('mfa_enabled', True)
+        save_all_users()
+        return jsonify({"success": True})
+    return jsonify({"error": "Not Found"}), 404
 
-# --- ROUTE: LOGOUT ---
+@app.route('/admin/delete_user', methods=['POST'])
+def delete_user():
+    if session.get('role') != 'admin': return jsonify({"error": "Unauthorized"}), 401
+    user_id = request.json.get('user_id')
+    if user_id == "1": return jsonify({"error": "Cannot delete admin"}), 403
+    if user_id in USER_DB_CACHE:
+        del USER_DB_CACHE[user_id]
+        save_all_users()
+        ledger.add_log("ADMIN", f"DELETED_USER: {user_id}", "WARNING", request.remote_addr)
+        return jsonify({"success": True})
+    return jsonify({"error": "Not Found"}), 404
+
 @app.route('/logout')
 def logout():
-    user_id = session.get('user_id')
-    if user_id:
-        try:
-            ledger.add_log(user_id, "LOGOUT", "SUCCESS", request.remote_addr)
-        except Exception as e:
-            print(f"⚠️ Failed to log logout: {e}")
-
     session.clear()
     return jsonify({"message": "Logged out"})
 
+def open_browser():
+    if not os.environ.get("WERKZEUG_RUN_MAIN"):
+        webbrowser.open_new('http://127.0.0.1:5000')
+
 if __name__ == '__main__':
-    print(f"🚀 FaceChain Server Running.")
+    print("🚀 FaceChain Server Running on Port 5000...")
+    Timer(1, open_browser).start()
     app.run(debug=True, port=5000)

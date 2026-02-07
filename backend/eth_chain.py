@@ -1,199 +1,143 @@
 from web3 import Web3
-from solcx import compile_standard, install_solc
-import json
+from solcx import compile_source, install_solc, get_installed_solc_versions
 import os
+import json
 import time
+from datetime import datetime
 
 # --- CONFIGURATION ---
-GANACHE_URL = "http://127.0.0.1:7545"
-web3 = Web3(Web3.HTTPProvider(GANACHE_URL))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CONTRACTS_DIR = os.path.join(BASE_DIR, "contracts")
 
-if not web3.is_connected():
-    print("❌ CRITICAL ERROR: Could not connect to Ganache!")
-    exit()
-else:
-    print("✅ Connected to Ethereum (Ganache)")
+CONTRACT_ADDRESS_FILE = os.path.join(CONTRACTS_DIR, "contract_address.txt")
+SOLIDITY_SOURCE_FILE = os.path.join(CONTRACTS_DIR, "FaceAuth.sol")
 
-ADMIN_ACCT = web3.eth.accounts[0]
-web3.eth.default_account = ADMIN_ACCT
+GANACHE_URL = "http://127.0.0.1:7545" 
 
-# --- SOLIDITY SOURCE CODE ---
-SOLIDITY_SOURCE = '''
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
-
-contract FaceAuth {
-    struct UserProfile {
-        string userId;
-        int256[] faceEmbedding; 
-        bool exists;
-    }
-    
-    mapping(string => UserProfile) private users;
-    
-    event UserRegistered(string userId, uint256 timestamp);
-    event AuthAttempt(string userId, bool success, int256 distance, uint256 timestamp);
-    event AdminAction(string userId, string action, string status, uint256 timestamp);
-
-    function registerUser(string memory _id, int256[] memory _embedding) public {
-        require(_embedding.length == 128, "Invalid Face Data length");
-        users[_id] = UserProfile(_id, _embedding, true);
-        emit UserRegistered(_id, block.timestamp);
-    }
-
-    function verifyUser(string memory _id, int256[] memory _inputEmbedding) public returns (bool) {
-        require(users[_id].exists, "User not found on chain");
-        require(_inputEmbedding.length == 128, "Invalid Input Data length");
-
-        int256 storedDistance = 0;
-        int256[] memory storedFace = users[_id].faceEmbedding;
-
-        for (uint i = 0; i < 128; i++) {
-            int256 diff = storedFace[i] - _inputEmbedding[i];
-            storedDistance += diff * diff; 
-        }
-
-        // Threshold: 0.6 distance ~ 36,000,000 (scaled by 10000^2)
-        bool isMatch = storedDistance < 45000000; 
-        
-        emit AuthAttempt(_id, isMatch, storedDistance, block.timestamp);
-        return isMatch;
-    }
-
-    function addLog(string memory _user, string memory _action, string memory _status) public {
-        emit AdminAction(_user, _action, _status, block.timestamp);
-    }
-}
-'''
-
-class EthereumLedger:
+class EthLedger:
     def __init__(self):
-        self.address_file = "contract_address.txt"
+        self.w3 = Web3(Web3.HTTPProvider(GANACHE_URL))
+        self.account = None
         self.contract = None
-        self.init_contract()
+        
+        if self.w3.is_connected():
+            print("✅ Connected to Ethereum (Ganache)")
+            self.account = self.w3.eth.accounts[0] # Admin Account
+            self.setup_contract()
+        else:
+            print("❌ Blockchain Connection Failed. Is Ganache running?")
 
-    def compile_source(self):
-        print("⚙️  Compiling Solidity Code...")
+    def setup_contract(self):
+        # 1. Check if we have an existing address
+        if os.path.exists(CONTRACT_ADDRESS_FILE):
+            try:
+                with open(CONTRACT_ADDRESS_FILE, 'r') as f:
+                    address = f.read().strip()
+                
+                if not Web3.is_address(address): raise ValueError("Invalid address")
+
+                abi = self.compile_contract_abi()
+                if abi:
+                    self.contract = self.w3.eth.contract(address=address, abi=abi)
+                    print(f"🔗 Connected to Smart Contract: {address}")
+                    return
+            except Exception as e:
+                print(f"⚠️ Contract Load Error: {e}")
+
+        # 2. Deploy New if needed
+        print("⚙️  Compiling & Deploying New Contract...")
+        abi, bytecode = self.compile_contract_full()
+        if not abi or not bytecode: return
+
         try:
-            # Install specific solc version if missing
-            install_solc('0.8.0')
+            FaceAuth = self.w3.eth.contract(abi=abi, bytecode=bytecode)
+            tx_hash = FaceAuth.constructor().transact({'from': self.account})
+            tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
             
-            compiled_sol = compile_standard({
-                "language": "Solidity",
-                "sources": {"FaceAuth.sol": {"content": SOLIDITY_SOURCE}},
-                "settings": {"outputSelection": {"*": {"*": ["abi", "metadata", "evm.bytecode", "evm.sourceMap"]}}}
-            }, solc_version='0.8.0')
+            contract_address = tx_receipt.contractAddress
+            self.contract = self.w3.eth.contract(address=contract_address, abi=abi)
             
-            bytecode = compiled_sol['contracts']['FaceAuth.sol']['FaceAuth']['evm']['bytecode']['object']
-            abi = json.loads(compiled_sol['contracts']['FaceAuth.sol']['FaceAuth']['metadata'])['output']['abi']
-            return abi, bytecode
+            with open(CONTRACT_ADDRESS_FILE, 'w') as f:
+                f.write(contract_address)
+                
+            print(f"✅ New Contract Deployed at: {contract_address}")
+            
+            # Add a startup log
+            self.add_log("SYSTEM", "CONTRACT_DEPLOY", "SUCCESS", "127.0.0.1")
+            
         except Exception as e:
-            print(f"❌ COMPILATION FAILED: {e}")
+            print(f"❌ Deployment Failed: {e}")
+
+    def compile_contract_abi(self):
+        abi, _ = self.compile_contract_full()
+        return abi
+
+    def compile_contract_full(self):
+        try:
+            with open(SOLIDITY_SOURCE_FILE, 'r') as f:
+                source = f.read()
+            
+            target_version = '0.8.0'
+            installed_versions = [str(v) for v in get_installed_solc_versions()]
+            if target_version not in installed_versions:
+                install_solc(target_version)
+            
+            compiled_sol = compile_source(
+                source, output_values=['abi', 'bin'], solc_version=target_version
+            )
+            contract_id, contract_interface = next(iter(compiled_sol.items()))
+            return contract_interface['abi'], contract_interface['bin']
+        except Exception as e:
+            print(f"❌ Solc Error: {e}")
             return None, None
 
-    def init_contract(self):
-        # 1. Always compile to get fresh ABI/Bytecode
-        self.abi, self.bytecode = self.compile_source()
-        if not self.abi or not self.bytecode: return
+    # --- PUBLIC METHODS ---
 
-        # 2. Check for existing deployment
-        if os.path.exists(self.address_file):
-            with open(self.address_file, "r") as f:
-                addr = f.read().strip()
-            if web3.is_address(addr):
-                self.contract = web3.eth.contract(address=addr, abi=self.abi)
-                print(f"🔗 Connected to Smart Contract: {addr}")
-                return
-
-        # 3. If no file, Deploy new
-        self.deploy_contract()
-
-    def deploy_contract(self):
-        print("⚡ Deploying Verification Smart Contract...")
-        try:
-            FaceAuth = web3.eth.contract(abi=self.abi, bytecode=self.bytecode)
-            tx_hash = FaceAuth.constructor().transact({'from': ADMIN_ACCT})
-            tx_receipt = web3.eth.wait_for_transaction_receipt(tx_hash)
-            
-            addr = tx_receipt.contractAddress
-            with open(self.address_file, "w") as f:
-                f.write(addr)
-            
-            self.contract = web3.eth.contract(address=addr, abi=self.abi)
-            print(f"🚀 Contract Deployed Successfully: {addr}")
-        except Exception as e:
-            print(f"❌ DEPLOYMENT FAILED: {e}")
-
-    # Helper: Convert Float Embeddings to Integers
-    def prepare_embedding(self, embedding):
-        return [int(x * 10000) for x in embedding]
-
-    def register_user(self, user_id, embedding):
+    def register_user(self, user_id, encoding):
         if not self.contract: return False
         try:
-            int_embedding = self.prepare_embedding(embedding)
-            # INCREASED GAS TO 6,000,000
-            tx_hash = self.contract.functions.registerUser(str(user_id), int_embedding).transact({'from': ADMIN_ACCT, 'gas': 6000000})
-            web3.eth.wait_for_transaction_receipt(tx_hash)
-            print(f"⛏️  User {user_id} Registered on Blockchain!")
+            # Convert float array to int array for solidity
+            encoding_int = [int(val * 1000000) for val in encoding]
+            tx_hash = self.contract.functions.registerUser(
+                str(user_id), encoding_int
+            ).transact({'from': self.account})
+            self.w3.eth.wait_for_transaction_receipt(tx_hash)
             return True
         except Exception as e:
-            print(f"❌ Register Error: {e}")
+            print(f"⚠️ Blockchain Register Error: {e}")
             return False
 
-    def verify_user(self, user_id, live_embedding):
-        if not self.contract: return False
-        try:
-            int_embedding = self.prepare_embedding(live_embedding)
-            # INCREASED GAS TO 6,000,000
-            tx_hash = self.contract.functions.verifyUser(str(user_id), int_embedding).transact({'from': ADMIN_ACCT, 'gas': 6000000})
-            web3.eth.wait_for_transaction_receipt(tx_hash)
-            print(f"⛏️  Verification Computed on Blockchain.")
-            return True
-        except Exception as e:
-            print(f"❌ On-Chain Verify Failed: {e}")
-            return False
+    def verify_user(self, user_id, encoding):
+        # Optional: On-chain verification logic could go here
+        # For now, we just log the successful verification event
+        self.add_log(user_id, "FACE_VERIFY", "MATCH_FOUND", "127.0.0.1")
 
-    def add_log(self, user_id, action, status, ip=""):
-        if not self.contract: return None
+    def add_log(self, user_id, action, status, ip):
+        if not self.contract: return
         try:
-            tx_hash = self.contract.functions.addLog(str(user_id), f"{action} ({ip})", str(status)).transact({'from': ADMIN_ACCT, 'gas': 600000})
-            return tx_hash.hex()
-        except Exception as e:
-            print(f"❌ Log Error: {e}")
-            return None
+            self.contract.functions.addAuditLog(
+                str(user_id), action, status, ip, int(time.time())
+            ).transact({'from': self.account})
+            print(f"📝 Log Added: {action} - {status}")
+        except Exception as e: 
+            print(f"⚠️ Logging Failed: {e}")
 
     def get_logs(self):
         if not self.contract: return []
         try:
-            logs = []
-            # Fetch generic admin logs
-            events = self.contract.events.AdminAction.get_logs(from_block=0)
-            for e in events:
-                logs.append({
-                    "user_id": e.args.userId,
-                    "action": e.args.action,
-                    "status": e.args.status,
-                    "timestamp": e.args.timestamp,
-                    "hash_short": e.transactionHash.hex()[:10] + "..."
+            logs = self.contract.functions.getAuditLogs().call()
+            formatted = []
+            for l in reversed(logs):
+                formatted.append({
+                    "user_id": l[0],
+                    "action": l[1],
+                    "status": l[2],
+                    "ip": l[3],
+                    "timestamp": datetime.fromtimestamp(int(l[4])).strftime('%H:%M:%S')
                 })
-            
-            # Fetch verification attempts
-            attempts = self.contract.events.AuthAttempt.get_logs(from_block=0)
-            for e in attempts:
-                status = "SUCCESS" if e.args.success else "FAILED"
-                logs.append({
-                    "user_id": e.args.userId,
-                    "action": "ON-CHAIN VERIFY",
-                    "status": status,
-                    "timestamp": e.args.timestamp,
-                    "hash_short": e.transactionHash.hex()[:10] + "..."
-                })
-                
-            logs.sort(key=lambda x: x['timestamp'], reverse=True)
-            return logs
+            return formatted
         except Exception as e:
-            print(f"❌ Read Error: {e}")
+            print(f"⚠️ Fetch Logs Error: {e}")
             return []
 
-eth_ledger = EthereumLedger()
+eth_ledger = EthLedger()
