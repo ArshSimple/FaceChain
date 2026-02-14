@@ -1,7 +1,7 @@
 # ==========================================
 # 1. INITIALIZATION & SECURITY SETUP
 # ==========================================
-import warnings, os, logging, secrets, json, webbrowser
+import os, secrets, json, webbrowser
 from threading import Timer
 from flask import Flask, request, jsonify, session, send_from_directory
 from flask_cors import CORS
@@ -9,10 +9,6 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import pyotp, face_utils
 from eth_chain import eth_ledger as ledger
-
-# Silence specific warnings & logs
-warnings.filterwarnings("ignore", category=UserWarning, message=".*pkg_resources.*")
-logging.getLogger('werkzeug').setLevel(logging.ERROR)
 
 # Config & Paths
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -33,6 +29,20 @@ limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "5
 # ==========================================
 print("🚀 Loading Database...")
 USER_DB = face_utils.load_embeddings() # Load RAM Cache
+
+# --- AUTO-CREATE ADMIN (User ID "1") ---
+if "1" not in USER_DB:
+    print("⚠️ Admin not found. Creating default Admin (ID: 1)...")
+    USER_DB["1"] = {
+        "encoding": [], 
+        "mfa_secret": pyotp.random_base32(),
+        "role": "admin",
+        "name": "System Admin",
+        "roll_no": "1",
+        "exam_subjects": ["Blockchain", "Network Security", "AI/ML"], # Admin can view these
+        "mfa_enabled": False,
+        "exams_verified": []
+    }
 
 def save_db():
     """Saves RAM Cache to JSON file."""
@@ -88,7 +98,6 @@ def register():
 
         uri = pyotp.totp.TOTP(mfa_secret).provisioning_uri(name=f"{name} ({uid})", issuer_name="FaceChain")
         
-        # ✅ FIX: Added 'msg' here so frontend doesn't show "undefined"
         return json_resp(True, {"mfa_uri": uri}, msg="✅ Registration Successful! Please scan the QR Code.")
         
     except Exception as e: return json_resp(False, msg=str(e), code=500)
@@ -177,17 +186,30 @@ def del_sched():
 
 @app.route('/admin/user_ops', methods=['POST'])
 def user_ops():
-    """Handles Delete User AND Toggle MFA to save lines."""
+    """Handles Delete User (Soft Delete: Wipes Face, Keeps ID) AND Toggle MFA."""
     if session.get('role') != 'admin': return json_resp(False, code=401)
     d = request.json
-    uid, action = d.get('user_id'), d.get('action') # 'delete' or 'toggle_mfa'
+    uid, action = d.get('user_id'), d.get('action') 
 
     if uid not in USER_DB: return json_resp(False, msg="Not Found", code=404)
     
     if action == 'delete':
         if uid == "1": return json_resp(False, msg="Cannot delete Admin", code=403)
-        del USER_DB[uid]
-        ledger.add_log("ADMIN", f"DELETED: {uid}", "WARNING", request.remote_addr)
+        
+        # --- NEW LOGIC: SOFT DELETE ---
+        # 1. Wipe the Biometric Data (Privacy)
+        USER_DB[uid]['encoding'] = [] 
+        
+        # 2. Disable Access keys
+        USER_DB[uid]['mfa_secret'] = ""
+        USER_DB[uid]['mfa_enabled'] = False
+        
+        # 3. Mark Name (Visual Indicator)
+        if "(Deleted)" not in USER_DB[uid]['name']:
+            USER_DB[uid]['name'] += " (Deleted)"
+            
+        ledger.add_log("ADMIN", f"WIPED_FACE: {uid}", "WARNING", request.remote_addr)
+
     elif action == 'toggle_mfa':
         USER_DB[uid]['mfa_enabled'] = not USER_DB[uid].get('mfa_enabled', True)
     
@@ -198,6 +220,40 @@ def user_ops():
 def logout():
     session.clear()
     return json_resp(True, msg="Logged out")
+
+# ==========================================
+# 5. MONITORING & MAIN
+# ==========================================
+@app.route('/monitor_exam', methods=['POST'])
+def monitor_exam():
+    """Silent background check to ensure the student is still in front of the screen."""
+    if not session.get('logged_in'): 
+        return json_resp(False, msg="Session Expired", code=401)
+    
+    uid = session.get('user_id')
+    img_data = request.json.get('image')
+    
+    try:
+        current_frame = face_utils.decode_image(img_data)
+        current_encoding = face_utils.get_face_embedding(current_frame)
+    except:
+        return json_resp(False, msg="Frame Error")
+
+    if current_encoding is None:
+        ledger.add_log(uid, "MONITORING", "FACE_MISSING", request.remote_addr)
+        return json_resp(False, msg="⚠️ Warning: No face detected! Please look at the screen.")
+
+    stored_data = USER_DB.get(uid)
+    if not stored_data or not stored_data['encoding']: # Handle deleted users too
+        return json_resp(False, msg="User Data Error")
+
+    is_match = face_utils.face_recognition.compare_faces([stored_data['encoding']], current_encoding, tolerance=0.5)[0]
+
+    if is_match:
+        return json_resp(True, msg="Verified")
+    else:
+        ledger.add_log(uid, "MONITORING", "FRAUD_DETECTED", request.remote_addr)
+        return json_resp(False, msg="⚠️ ALARM: Different person detected!")
 
 if __name__ == '__main__':
     print("🚀 FaceChain Server Running (Secure Mode)...")

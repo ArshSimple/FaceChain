@@ -108,8 +108,7 @@ class EthLedger:
             return False
 
     def verify_user(self, user_id, encoding):
-        # Optional: On-chain verification logic could go here
-        # For now, we just log the successful verification event
+        
         self.add_log(user_id, "FACE_VERIFY", "MATCH_FOUND", "127.0.0.1")
 
     def add_log(self, user_id, action, status, ip):

@@ -8,8 +8,15 @@
     <style>
         .hidden-section { display: none !important; }
         .mirror-mode { transform: scaleX(-1); }
-        .correct-answer { background-color: #ecfdf5; border-left: 4px solid #10b981; }
-        .wrong-answer { background-color: #fef2f2; border-left: 4px solid #ef4444; }
+        
+        /* Exam Results Styling */
+        .correct-block { background-color: rgba(16, 185, 129, 0.1); border-left: 4px solid #10b981; }
+        .wrong-block { background-color: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; }
+        .correct-option-highlight { background-color: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; font-weight: bold; }
+
+        /* Warning Toast Animation */
+        @keyframes flashRed { 0% { background-color: #ef4444; } 50% { background-color: #7f1d1d; } 100% { background-color: #ef4444; } }
+        .warning-active { animation: flashRed 1s infinite; }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-200 min-h-screen">
@@ -105,11 +112,25 @@
             </div>
         </div>
 
-        <div id="section-exam" class="hidden-section bg-slate-800 p-8 rounded-2xl border border-slate-700">
+        <div id="section-exam" class="hidden-section bg-slate-800 p-8 rounded-2xl border border-slate-700 relative">
+            
+            <div id="monitor-alert" class="hidden-section absolute top-4 right-4 bg-red-600 text-white p-4 rounded shadow-lg z-50 max-w-xs animate-pulse">
+                <p class="font-bold">⚠️ PROCTORING ALERT</p>
+                <p id="monitor-msg" class="text-sm mt-1">Face not detected!</p>
+            </div>
+
+            <div id="monitor-box" class="hidden-section fixed bottom-4 right-4 w-40 h-32 bg-black border-2 border-slate-500 rounded-lg overflow-hidden shadow-2xl z-50">
+                <video id="monitor-video" class="w-full h-full object-cover mirror-mode" autoplay playsinline muted></video>
+                <div class="absolute bottom-0 w-full bg-black/50 text-xs text-center text-white py-1">Proctoring Active</div>
+            </div>
+
             <div class="flex justify-between items-center border-b border-slate-700 pb-4 mb-6">
                 <h2 class="text-2xl font-bold text-white">Student Dashboard</h2>
-                <p class="text-slate-400">Roll No: <span id="student-id-display" class="text-blue-400 font-mono">--</span></p>
+                <div class="text-right">
+                    <p class="text-slate-400">Roll No: <span id="student-id-display" class="text-blue-400 font-mono">--</span></p>
+                </div>
             </div>
+            
             <div id="exam-list" class="space-y-4"></div>
             
             <div id="active-exam-paper" class="hidden-section mt-8 pt-6 border-t border-slate-700">
@@ -117,7 +138,7 @@
                 <div id="questions-container" class="space-y-6"></div>
                 <div class="mt-8 flex gap-4">
                     <button id="btn-submit" onclick="submitExam()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded">Submit Exam</button>
-                    <button id="btn-close" onclick="closeExam()" class="hidden-section w-full bg-slate-700 text-white py-3 rounded">Return</button>
+                    <button id="btn-close" onclick="closeExam()" class="hidden-section w-full bg-slate-700 text-white py-3 rounded">Return to List</button>
                 </div>
             </div>
         </div>
@@ -127,8 +148,9 @@
         const API_URL = "http://127.0.0.1:5000";
         let capturedImage = null;
         let examSchedule = {};
+        let monitoringInterval = null; 
+        let completedExams = new Set(); // Track finished exams
 
-        // Question Bank (Same as before)
         const QUESTION_BANK = {
             "Blockchain": [
                 { q: "What is the genesis block?", options: ["First block", "Last block", "Orphan block"], ans: "First block" },
@@ -149,148 +171,105 @@
         // --- NAVIGATION & CAMERA CONTROL ---
 
         function stopAllCameras() {
-            // Helper to stop all video streams
             document.querySelectorAll('video').forEach(vid => {
                 if(vid.srcObject) {
                     vid.srcObject.getTracks().forEach(track => track.stop());
                     vid.srcObject = null;
                 }
             });
+            stopMonitoring(); 
         }
 
         function showSection(id) {
-            stopAllCameras(); // Stop previous cameras first
-            
+            stopAllCameras();
             document.querySelectorAll('.hidden-section').forEach(el => el.classList.add('hidden-section'));
             document.querySelectorAll('[id^="section-"]').forEach(el => el.classList.add('hidden-section'));
             document.getElementById(id).classList.remove('hidden-section');
             
-            // Logic to start camera based on section
-            if(id === 'section-register') {
-                toggleInput('camera');
-            }
-            if(id === 'section-login') {
-                startLoginCamera();
-            }
+            if(id === 'section-register') toggleInput('camera');
+            if(id === 'section-login') startLoginCamera();
         }
 
-        function logout() { location.reload(); }
-
-        // --- REGISTER CAMERA LOGIC ---
-        function toggleInput(mode) {
-            if(mode === 'camera') {
-                document.getElementById('camera-container').classList.remove('hidden-section');
-                document.getElementById('upload-container').classList.add('hidden-section');
-                document.getElementById('btn-capture').classList.remove('hidden-section');
-                navigator.mediaDevices.getUserMedia({video:true}).then(s => document.getElementById('video').srcObject = s);
-            } else {
-                document.getElementById('camera-container').classList.add('hidden-section');
-                document.getElementById('upload-container').classList.remove('hidden-section');
-                document.getElementById('btn-capture').classList.add('hidden-section');
-                stopAllCameras();
-            }
+        function logout() { 
+            stopMonitoring();
+            fetch('/logout').then(() => location.reload());
         }
 
-        function captureFace() {
-            let v = document.getElementById('video');
-            let c = document.getElementById('canvas');
+        // --- MONITORING LOGIC ---
+
+        function startMonitoring() {
+            console.log("Starting Exam Proctoring...");
+            document.getElementById('monitor-box').classList.remove('hidden-section'); // Show the box
+            
+            navigator.mediaDevices.getUserMedia({video: true}).then(stream => {
+                document.getElementById('monitor-video').srcObject = stream;
+                
+                // Check face every 5 seconds
+                monitoringInterval = setInterval(async () => {
+                    checkFacePresence();
+                }, 5000); 
+            }).catch(e => console.error("Proctoring Camera Failed", e));
+        }
+
+        function stopMonitoring() {
+            if (monitoringInterval) {
+                clearInterval(monitoringInterval);
+                monitoringInterval = null;
+            }
+            document.getElementById('monitor-box').classList.add('hidden-section'); // Hide the box
+            let mv = document.getElementById('monitor-video');
+            if(mv.srcObject) mv.srcObject.getTracks().forEach(t => t.stop());
+        }
+
+        async function checkFacePresence() {
+            let v = document.getElementById('monitor-video');
+            if (!v.srcObject) return;
+
+            let c = document.createElement('canvas');
             c.width = v.videoWidth; c.height = v.videoHeight;
-            let ctx = c.getContext('2d');
-            ctx.translate(c.width, 0); ctx.scale(-1, 1); ctx.drawImage(v, 0, 0);
-            capturedImage = c.toDataURL('image/jpeg');
-            document.getElementById('capture-status').classList.remove('hidden-section');
-        }
-
-        function handleFileUpload(input) {
-            let reader = new FileReader();
-            reader.onload = function(e) { 
-                capturedImage = e.target.result; 
-                document.getElementById('preview-img').src = capturedImage;
-                document.getElementById('preview-img').classList.remove('hidden-section');
-                document.getElementById('upload-placeholder').classList.add('hidden-section');
-                document.getElementById('capture-status').classList.remove('hidden-section');
-            };
-            reader.readAsDataURL(input.files[0]);
-        }
-
-        // --- LOGIN LOGIC (UPDATED) ---
-
-        function startLoginCamera() {
-            navigator.mediaDevices.getUserMedia({video:true})
-                .then(s => document.getElementById('login-video').srcObject = s)
-                .catch(err => alert("Camera permission denied"));
-        }
-
-        async function performLogin() {
-            let roll = document.getElementById('login-roll').value;
-            if(!roll) return alert("Please enter Roll No");
-
-            // Capture from Login Video
-            let v = document.getElementById('login-video');
-            let c = document.createElement('canvas'); // Create temp canvas
-            c.width = v.videoWidth; c.height = v.videoHeight;
-            c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+            c.getContext('2d').drawImage(v, 0, 0);
             let img = c.toDataURL('image/jpeg');
 
-            // Send to Backend
             try {
-                let res = await fetch(`${API_URL}/authenticate`, {
-                    method:'POST', 
-                    headers:{'Content-Type':'application/json'}, 
-                    body:JSON.stringify({user_id:roll, image:img})
+                let res = await fetch(`${API_URL}/monitor_exam`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ image: img })
                 });
                 let data = await res.json();
-                
-                if(data.match) {
-                    stopAllCameras(); // Stop camera on success
-                    let code = data.mfa_required ? prompt("MFA Code (Check Authenticator App):") : "000000";
-                    if(code) verifyMFA(roll, code);
+                let alertBox = document.getElementById('monitor-alert');
+                let alertMsg = document.getElementById('monitor-msg');
+
+                if (data.success) {
+                    alertBox.classList.add('hidden-section');
                 } else {
-                    alert("❌ Face Mismatch or User Not Found");
+                    alertMsg.innerText = data.message;
+                    alertBox.classList.remove('hidden-section');
                 }
             } catch (e) {
-                alert("Server Error: " + e);
+                console.log("Monitoring Error (Ignored)");
             }
-        }
-
-        // --- COMMON API CALLS ---
-        async function registerUser() {
-            let roll = document.getElementById('reg-roll').value;
-            let name = document.getElementById('reg-name').value;
-            let subs = Array.from(document.querySelectorAll('.subject-cb:checked')).map(c=>c.value);
-            if(!roll || !capturedImage) return alert("Fill data & capture photo");
-            
-            let res = await fetch(`${API_URL}/register`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id:roll, name:name, roll_no:roll, exam_subjects:subs, image:capturedImage})});
-            let data = await res.json();
-            if(data.mfa_uri) {
-                document.getElementById('qrcode').innerHTML = "";
-                new QRCode(document.getElementById('qrcode'), data.mfa_uri);
-                document.getElementById('mfa-popup').classList.remove('hidden-section');
-            } else alert(data.message);
-        }
-
-        async function verifyMFA(uid, code) {
-            let res = await fetch(`${API_URL}/verify-mfa`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id:uid, code:code})});
-            let data = await res.json();
-            if(data.success) {
-                examSchedule = data.schedule;
-                document.getElementById('student-id-display').innerText = uid;
-                if(data.role === 'admin') window.location.href="admin_dashboard.html";
-                else { renderExamList(data.exam_subjects); showSection('section-exam'); }
-            } else alert("Invalid Code");
         }
 
         // --- EXAM LOGIC ---
+
         function renderExamList(subs) {
             let list = document.getElementById('exam-list'); list.innerHTML="";
             let today = new Date().toISOString().split('T')[0];
             subs.forEach(s => {
                 let date = examSchedule[s] || "TBA";
+                let isCompleted = completedExams.has(s); // Check if exam is done
+                
                 let btn = "bg-slate-700 text-slate-500 cursor-not-allowed";
                 let disabled = "disabled";
                 let badge = `<span class="text-slate-500">Scheduled: ${date}</span>`;
+                let btnText = "Start";
 
-                if(date === today) {
+                if (isCompleted) {
+                    btn = "bg-emerald-900 text-emerald-500 border border-emerald-700 cursor-not-allowed";
+                    btnText = "Completed";
+                    badge = `<span class="text-emerald-500 font-bold">✔ Submitted</span>`;
+                } else if (date === today) {
                     btn = "bg-blue-600 hover:bg-blue-500 text-white shadow";
                     disabled = "";
                     badge = `<span class="text-emerald-400 font-bold">● LIVE NOW</span>`;
@@ -299,47 +278,199 @@
                 list.innerHTML += `
                     <div class="bg-slate-900 p-4 rounded border border-slate-700 flex justify-between items-center">
                         <div><h4 class="font-bold text-white">${s}</h4><div class="text-sm">${badge}</div></div>
-                        <button onclick="startExam('${s}')" ${disabled} class="px-6 py-2 rounded ${btn}">Start</button>
+                        <button onclick="startExam('${s}')" ${disabled} class="px-6 py-2 rounded ${btn}">${btnText}</button>
                     </div>`;
             });
         }
 
         async function startExam(sub) {
+            stopMonitoring(); // Reset monitoring to be safe
+            
             await fetch(`${API_URL}/mark_exam_verified`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ subject: sub })
             });
+
+            // Start Monitoring (Auto-Restart)
+            startMonitoring();
 
             let qs = QUESTION_BANK[sub] || [];
             document.getElementById('exam-list').classList.add('hidden-section');
             document.getElementById('active-exam-paper').classList.remove('hidden-section');
             document.getElementById('paper-title').innerText = sub;
             let c = document.getElementById('questions-container'); c.innerHTML="";
+            
+            // Render Questions
             qs.forEach((q,i) => {
-                let opts = q.options.map(o => `<label class="block bg-slate-900 p-3 rounded mb-2 cursor-pointer border border-slate-700 hover:border-blue-500"><input type="radio" name="q${i}" value="${o}" class="mr-2 accent-blue-500"> ${o}</label>`).join('');
-                c.innerHTML += `<div class="q-block bg-slate-800 p-6 rounded border border-slate-700" data-ans="${q.ans}"><p class="font-bold text-white mb-4">Q${i+1}. ${q.q}</p>${opts}</div>`;
+                let opts = q.options.map(o => `
+                    <label class="block bg-slate-900 p-3 rounded mb-2 cursor-pointer border border-slate-700 hover:border-blue-500 transition">
+                        <input type="radio" name="q${i}" value="${o}" class="mr-2 accent-blue-500"> ${o}
+                    </label>`).join('');
+                
+                c.innerHTML += `
+                    <div class="q-block bg-slate-800 p-6 rounded border border-slate-700" data-ans="${q.ans}">
+                        <p class="font-bold text-white mb-4">Q${i+1}. ${q.q}</p>
+                        ${opts}
+                    </div>`;
             });
             document.getElementById('btn-submit').classList.remove('hidden-section');
             document.getElementById('btn-close').classList.add('hidden-section');
         }
 
         function submitExam() {
-            let score=0; let blocks=document.querySelectorAll('.q-block');
+            stopMonitoring(); // Stop monitoring when done
+            
+            // Mark Exam as Completed
+            let currentSubject = document.getElementById('paper-title').innerText;
+            completedExams.add(currentSubject);
+
+            let score=0; 
+            let blocks=document.querySelectorAll('.q-block');
+            
             blocks.forEach(b => {
-                let ans = b.dataset.ans;
+                let ans = b.dataset.ans; // Correct Answer
                 let inps = b.querySelectorAll('input');
-                let sel = null;
-                inps.forEach(i => { if(i.checked) sel=i.value; i.disabled=true; });
-                if(sel===ans) { score++; b.classList.add('correct-answer'); }
-                else if(sel) b.classList.add('wrong-answer');
+                let userSelected = null;
+                
+                // 1. Find what user selected & Disable all
+                inps.forEach(i => { 
+                    if(i.checked) userSelected = i.value; 
+                    i.disabled = true; 
+                });
+
+                // 2. Visual Grading Logic
+                if (userSelected === ans) {
+                    score++;
+                    b.classList.add('correct-block'); // Green Border
+                } else {
+                    if(userSelected) b.classList.add('wrong-block'); // Red Border
+                    // Highlight correct answer
+                    inps.forEach(i => {
+                        if (i.value === ans) {
+                            i.parentElement.classList.add('correct-option-highlight');
+                            let span = document.createElement('span');
+                            span.innerText = " ✅ Correct Answer";
+                            span.className = "text-emerald-400 font-bold text-sm ml-2";
+                            i.parentElement.appendChild(span);
+                        }
+                    });
+                }
             });
-            alert(`Score: ${score}/${blocks.length}`);
+
+            alert(`Exam Submitted!\nScore: ${score}/${blocks.length}`);
             document.getElementById('btn-submit').classList.add('hidden-section');
             document.getElementById('btn-close').classList.remove('hidden-section');
         }
+
         function closeExam() {
             document.getElementById('active-exam-paper').classList.add('hidden-section');
             document.getElementById('exam-list').classList.remove('hidden-section');
+            if(window.studentSubjects) renderExamList(window.studentSubjects);
+        }
+
+        // --- AUTH & COMMON UTILS ---
+
+        async function verifyMFA(uid, code) {
+            let res = await fetch(`${API_URL}/verify-mfa`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id:uid, code:code})});
+            let data = await res.json();
+            if(data.success) {
+                examSchedule = data.schedule;
+                window.studentSubjects = data.exam_subjects; 
+                document.getElementById('student-id-display').innerText = uid;
+                
+                if(data.role === 'admin') {
+                    if(confirm("Admin Login: Go to Dashboard? (Cancel to view Exam Portal)")) { 
+                        window.location.href="admin_dashboard.html"; 
+                    } else { 
+                        renderExamList(window.studentSubjects); 
+                        showSection('section-exam'); 
+                    }
+                } else { 
+                    renderExamList(window.studentSubjects); 
+                    showSection('section-exam'); 
+                }
+            } else alert("Invalid Code");
+        }
+
+        function toggleInput(mode) { 
+            if(mode==='camera'){
+                document.getElementById('camera-container').classList.remove('hidden-section');
+                document.getElementById('upload-container').classList.add('hidden-section');
+                document.getElementById('btn-capture').classList.remove('hidden-section');
+                navigator.mediaDevices.getUserMedia({video:true}).then(s=>document.getElementById('video').srcObject=s);
+            } else {
+                document.getElementById('camera-container').classList.add('hidden-section');
+                document.getElementById('upload-container').classList.remove('hidden-section');
+                document.getElementById('btn-capture').classList.add('hidden-section');
+                stopAllCameras();
+            }
+        }
+
+        function captureFace() { 
+            let v=document.getElementById('video'); 
+            let c=document.getElementById('canvas'); 
+            c.width=v.videoWidth; c.height=v.videoHeight;
+            c.getContext('2d').drawImage(v,0,0);
+            capturedImage=c.toDataURL('image/jpeg');
+            document.getElementById('capture-status').classList.remove('hidden-section');
+        }
+
+        function handleFileUpload(input) { 
+            let r=new FileReader();
+            r.onload=e=>{
+                capturedImage=e.target.result;
+                document.getElementById('preview-img').src=capturedImage;
+                document.getElementById('preview-img').classList.remove('hidden-section');
+                document.getElementById('upload-placeholder').classList.add('hidden-section');
+                document.getElementById('capture-status').classList.remove('hidden-section');
+            };
+            r.readAsDataURL(input.files[0]);
+        }
+
+        function startLoginCamera() { 
+            navigator.mediaDevices.getUserMedia({video:true})
+                .then(s=>document.getElementById('login-video').srcObject=s)
+                .catch(e=>alert("Camera Denied"));
+        }
+
+        async function performLogin() { 
+            let roll=document.getElementById('login-roll').value;
+            if(!roll)return alert("Enter Roll");
+            
+            let v=document.getElementById('login-video');
+            let c=document.createElement('canvas');
+            c.width=v.videoWidth; c.height=v.videoHeight;
+            c.getContext('2d').drawImage(v,0,0);
+            let img=c.toDataURL('image/jpeg');
+            
+            try {
+                let r=await fetch(`${API_URL}/authenticate`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:roll,image:img})});
+                let d=await r.json();
+                if(d.match){
+                    stopAllCameras();
+                    let c=d.mfa_required?prompt("MFA Code:"):"000000";
+                    if(c)verifyMFA(roll,c);
+                } else alert("❌ Face Mismatch or User Not Found");
+            } catch(e){
+                alert("Server Error");
+            }
+        }
+
+        async function registerUser() { 
+            let roll=document.getElementById('reg-roll').value;
+            let name=document.getElementById('reg-name').value;
+            let subs=Array.from(document.querySelectorAll('.subject-cb:checked')).map(c=>c.value);
+            
+            if(!roll||!capturedImage)return alert("Fill Data");
+            
+            let r=await fetch(`${API_URL}/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:roll,name:name,roll_no:roll,exam_subjects:subs,image:capturedImage})});
+            let d=await r.json();
+            
+            if(d.mfa_uri){
+                document.getElementById('qrcode').innerHTML="";
+                new QRCode(document.getElementById('qrcode'),d.mfa_uri);
+                document.getElementById('mfa-popup').classList.remove('hidden-section');
+            } else alert(d.message);
         }
     </script>
 </body>

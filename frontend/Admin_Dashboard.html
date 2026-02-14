@@ -16,6 +16,7 @@
         
         <nav class="space-y-2 mb-auto">
             <div class="px-4 py-2 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20 text-xs font-bold">DASHBOARD</div>
+            <a href="/" class="block px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded text-xs font-bold transition">👁️ STUDENT VIEW</a>
         </nav>
 
         <button onclick="logout()" class="w-full py-2 bg-red-900/20 text-red-400 border border-red-900/30 rounded text-xs font-bold hover:bg-red-900/40">LOGOUT</button>
@@ -53,7 +54,8 @@
                                 <th class="p-3">Name</th>
                                 <th class="p-3">Roll No</th>
                                 <th class="p-3">Exam Status</th>
-                                <th class="p-3">MFA Control</th> <th class="p-3 text-right">Action</th>
+                                <th class="p-3">MFA Control</th> 
+                                <th class="p-3 text-right">Action</th>
                             </tr>
                         </thead>
                         <tbody id="userTableBody" class="divide-y divide-slate-800"></tbody>
@@ -102,13 +104,11 @@
                     <td class="p-3 font-bold text-white">${u.name}</td>
                     <td class="p-3 font-mono text-blue-400">${u.roll_no}</td>
                     <td class="p-3">${status || '<span class="text-slate-600">No Exams</span>'}</td>
-                    
                     <td class="p-3">
                         <button onclick="toggleMFA('${u.id}')" class="text-[10px] font-bold px-2 py-1 rounded border ${mfaClass}">
                             ${mfaText}
                         </button>
                     </td>
-
                     <td class="p-3 text-right">
                         ${u.id!=='1' ? `<button onclick="deleteUser('${u.id}')" class="text-xs text-red-400 bg-red-900/20 px-2 py-1 rounded hover:bg-red-900/40 border border-red-900/30">DELETE</button>` : '<span class="text-xs text-slate-600">Admin</span>'}
                     </td>
@@ -154,7 +154,6 @@
             }
         }
 
-        // --- UPDATED FUNCTIONS TO MATCH NEW BACKEND ---
         async function deleteUser(id) {
             if(confirm('Delete User?')) {
                 await fetch('/admin/user_ops', {
