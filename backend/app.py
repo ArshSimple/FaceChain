@@ -87,7 +87,10 @@ def register():
         ledger.add_log(uid, f"REGISTER: {name}", "SUCCESS", request.remote_addr)
 
         uri = pyotp.totp.TOTP(mfa_secret).provisioning_uri(name=f"{name} ({uid})", issuer_name="FaceChain")
-        return json_resp(True, {"mfa_uri": uri})
+        
+        # ✅ FIX: Added 'msg' here so frontend doesn't show "undefined"
+        return json_resp(True, {"mfa_uri": uri}, msg="✅ Registration Successful! Please scan the QR Code.")
+        
     except Exception as e: return json_resp(False, msg=str(e), code=500)
 
 @app.route('/authenticate', methods=['POST'])

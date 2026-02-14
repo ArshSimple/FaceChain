@@ -15,10 +15,11 @@
 <body class="bg-slate-900 text-slate-200 min-h-screen">
     <nav class="bg-slate-800 p-4 border-b border-slate-700 flex justify-between items-center sticky top-0 z-50">
         <h1 class="font-bold text-xl text-white">FACECHAIN <span class="text-blue-400">SECURE</span></h1>
-        <button onclick="logout()" class="text-sm text-slate-400 hover:text-white">Logout</button>
+        <button onclick="logout()" class="text-sm text-slate-400 hover:text-white">logout</button>
     </nav>
 
     <div class="max-w-5xl mx-auto p-6 mt-8">
+        
         <div id="section-home" class="text-center py-10">
             <h2 class="text-5xl font-bold text-white mb-10">Examination Portal</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -27,7 +28,7 @@
                     <h3 class="text-2xl font-bold text-white">New Student</h3>
                     <p class="text-slate-400">Register with Roll No & Face ID</p>
                 </div>
-                <div onclick="startLogin()" class="bg-slate-800 p-10 rounded-2xl border border-slate-700 hover:border-emerald-500 cursor-pointer shadow-lg">
+                <div onclick="showSection('section-login')" class="bg-slate-800 p-10 rounded-2xl border border-slate-700 hover:border-emerald-500 cursor-pointer shadow-lg">
                     <div class="text-5xl mb-4">🔐</div>
                     <h3 class="text-2xl font-bold text-white">Student Login</h3>
                     <p class="text-slate-400">Enter Exam Hall</p>
@@ -76,6 +77,26 @@
             </div>
         </div>
 
+        <div id="section-login" class="hidden-section bg-slate-800 p-8 rounded-2xl border border-slate-700 max-w-lg mx-auto">
+            <h2 class="text-2xl font-bold text-white mb-6 text-center">🔐 Biometric Login</h2>
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-slate-400 mb-2">Roll Number</label>
+                    <input type="text" id="login-roll" placeholder="Enter Roll No" class="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white">
+                </div>
+                
+                <div class="relative bg-black rounded-lg overflow-hidden h-64 border border-emerald-600 shadow-lg shadow-emerald-900/20">
+                    <video id="login-video" class="w-full h-full object-cover mirror-mode" autoplay playsinline></video>
+                    <div class="absolute inset-0 border-2 border-emerald-500/30 m-8 rounded-lg pointer-events-none"></div>
+                </div>
+
+                <div class="flex gap-4">
+                    <button onclick="location.reload()" class="w-1/3 bg-slate-700 text-white py-3 rounded">Back</button>
+                    <button onclick="performLogin()" class="w-2/3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded">Authenticate</button>
+                </div>
+            </div>
+        </div>
+
         <div id="mfa-popup" class="hidden-section fixed inset-0 bg-black/90 flex items-center justify-center z-50">
             <div class="bg-slate-900 p-8 rounded-2xl border border-slate-700 text-center">
                 <h3 class="text-2xl font-bold text-white mb-4">Setup 2FA</h3>
@@ -107,7 +128,7 @@
         let capturedImage = null;
         let examSchedule = {};
 
-        // Question Bank
+        // Question Bank (Same as before)
         const QUESTION_BANK = {
             "Blockchain": [
                 { q: "What is the genesis block?", options: ["First block", "Last block", "Orphan block"], ans: "First block" },
@@ -125,16 +146,37 @@
             ]
         };
 
+        // --- NAVIGATION & CAMERA CONTROL ---
+
+        function stopAllCameras() {
+            // Helper to stop all video streams
+            document.querySelectorAll('video').forEach(vid => {
+                if(vid.srcObject) {
+                    vid.srcObject.getTracks().forEach(track => track.stop());
+                    vid.srcObject = null;
+                }
+            });
+        }
+
         function showSection(id) {
-            document.querySelectorAll('.hidden-section').forEach(el => el.classList.add('hidden-section')); // Clear all
-            document.querySelectorAll('[id^="section-"]').forEach(el => el.classList.add('hidden-section')); // Clear main sections
-            document.getElementById(id).classList.remove('hidden-section'); // Show target
-            if(id === 'section-register') toggleInput('camera');
+            stopAllCameras(); // Stop previous cameras first
+            
+            document.querySelectorAll('.hidden-section').forEach(el => el.classList.add('hidden-section'));
+            document.querySelectorAll('[id^="section-"]').forEach(el => el.classList.add('hidden-section'));
+            document.getElementById(id).classList.remove('hidden-section');
+            
+            // Logic to start camera based on section
+            if(id === 'section-register') {
+                toggleInput('camera');
+            }
+            if(id === 'section-login') {
+                startLoginCamera();
+            }
         }
 
         function logout() { location.reload(); }
 
-        // --- CAMERA ---
+        // --- REGISTER CAMERA LOGIC ---
         function toggleInput(mode) {
             if(mode === 'camera') {
                 document.getElementById('camera-container').classList.remove('hidden-section');
@@ -145,7 +187,7 @@
                 document.getElementById('camera-container').classList.add('hidden-section');
                 document.getElementById('upload-container').classList.remove('hidden-section');
                 document.getElementById('btn-capture').classList.add('hidden-section');
-                let v = document.getElementById('video'); if(v.srcObject) v.srcObject.getTracks().forEach(t=>t.stop());
+                stopAllCameras();
             }
         }
 
@@ -171,7 +213,47 @@
             reader.readAsDataURL(input.files[0]);
         }
 
-        // --- API CALLS ---
+        // --- LOGIN LOGIC (UPDATED) ---
+
+        function startLoginCamera() {
+            navigator.mediaDevices.getUserMedia({video:true})
+                .then(s => document.getElementById('login-video').srcObject = s)
+                .catch(err => alert("Camera permission denied"));
+        }
+
+        async function performLogin() {
+            let roll = document.getElementById('login-roll').value;
+            if(!roll) return alert("Please enter Roll No");
+
+            // Capture from Login Video
+            let v = document.getElementById('login-video');
+            let c = document.createElement('canvas'); // Create temp canvas
+            c.width = v.videoWidth; c.height = v.videoHeight;
+            c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+            let img = c.toDataURL('image/jpeg');
+
+            // Send to Backend
+            try {
+                let res = await fetch(`${API_URL}/authenticate`, {
+                    method:'POST', 
+                    headers:{'Content-Type':'application/json'}, 
+                    body:JSON.stringify({user_id:roll, image:img})
+                });
+                let data = await res.json();
+                
+                if(data.match) {
+                    stopAllCameras(); // Stop camera on success
+                    let code = data.mfa_required ? prompt("MFA Code (Check Authenticator App):") : "000000";
+                    if(code) verifyMFA(roll, code);
+                } else {
+                    alert("❌ Face Mismatch or User Not Found");
+                }
+            } catch (e) {
+                alert("Server Error: " + e);
+            }
+        }
+
+        // --- COMMON API CALLS ---
         async function registerUser() {
             let roll = document.getElementById('reg-roll').value;
             let name = document.getElementById('reg-name').value;
@@ -184,27 +266,7 @@
                 document.getElementById('qrcode').innerHTML = "";
                 new QRCode(document.getElementById('qrcode'), data.mfa_uri);
                 document.getElementById('mfa-popup').classList.remove('hidden-section');
-            } else alert(data.error);
-        }
-
-        async function startLogin() {
-            let roll = prompt("Enter Roll No:");
-            if(!roll) return;
-            alert("Look at camera...");
-            let v = document.createElement('video'); v.autoplay=true;
-            navigator.mediaDevices.getUserMedia({video:true}).then(async s => {
-                v.srcObject=s; await new Promise(r=>setTimeout(r,1500));
-                let c = document.createElement('canvas'); c.width=640; c.height=480;
-                c.getContext('2d').drawImage(v,0,0,c.width,c.height);
-                let img = c.toDataURL('image/jpeg'); s.getTracks().forEach(t=>t.stop());
-
-                let res = await fetch(`${API_URL}/authenticate`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id:roll, image:img})});
-                let data = await res.json();
-                if(data.match) {
-                    let code = data.mfa_required ? prompt("MFA Code:") : "000000";
-                    if(code) verifyMFA(roll, code);
-                } else alert("Face Mismatch");
-            });
+            } else alert(data.message);
         }
 
         async function verifyMFA(uid, code) {
@@ -243,13 +305,11 @@
         }
 
         async function startExam(sub) {
-            // CALL BACKEND TO TRACK "VERIFIED" STATUS
             await fetch(`${API_URL}/mark_exam_verified`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ subject: sub })
             });
 
-            // UI LOGIC
             let qs = QUESTION_BANK[sub] || [];
             document.getElementById('exam-list').classList.add('hidden-section');
             document.getElementById('active-exam-paper').classList.remove('hidden-section');
