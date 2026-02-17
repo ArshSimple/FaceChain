@@ -8,18 +8,15 @@
     <style>
         .hidden-section { display: none !important; }
         .mirror-mode { transform: scaleX(-1); }
-        
-        /* Exam Results Styling */
         .correct-block { background-color: rgba(16, 185, 129, 0.1); border-left: 4px solid #10b981; }
         .wrong-block { background-color: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; }
+        .terminated-block { background-color: rgba(239, 68, 68, 0.1); border: 2px solid #ef4444; padding: 20px; text-align: center; }
         .correct-option-highlight { background-color: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; font-weight: bold; }
-
-        /* Warning Toast Animation */
         @keyframes flashRed { 0% { background-color: #ef4444; } 50% { background-color: #7f1d1d; } 100% { background-color: #ef4444; } }
         .warning-active { animation: flashRed 1s infinite; }
     </style>
 </head>
-<body class="bg-slate-900 text-slate-200 min-h-screen">
+<body class="bg-slate-900 text-slate-200 min-h-screen" onload="clearFields()">
     <nav class="bg-slate-800 p-4 border-b border-slate-700 flex justify-between items-center sticky top-0 z-50">
         <h1 class="font-bold text-xl text-white">FACECHAIN <span class="text-blue-400">SECURE</span></h1>
         <button onclick="logout()" class="text-sm text-slate-400 hover:text-white">logout</button>
@@ -47,8 +44,8 @@
             <h2 class="text-2xl font-bold text-white mb-6">📝 Student Registration</h2>
             <div class="space-y-6">
                 <div class="grid grid-cols-2 gap-4">
-                    <input type="text" id="reg-roll" placeholder="Roll Number (User ID)" class="bg-slate-900 border border-slate-600 rounded p-3 text-white">
-                    <input type="text" id="reg-name" placeholder="Full Name" class="bg-slate-900 border border-slate-600 rounded p-3 text-white">
+                    <input type="text" id="reg-roll" placeholder="Roll Number (User ID)" autocomplete="off" class="bg-slate-900 border border-slate-600 rounded p-3 text-white">
+                    <input type="text" id="reg-name" placeholder="Full Name (e.g. Arsh Agrawal)" autocomplete="off" class="bg-slate-900 border border-slate-600 rounded p-3 text-white">
                 </div>
                 <div class="bg-slate-900 p-4 rounded border border-slate-700">
                     <label class="block mb-2 font-bold text-slate-400">Subjects:</label>
@@ -89,7 +86,7 @@
             <div class="space-y-6">
                 <div>
                     <label class="block text-slate-400 mb-2">Roll Number</label>
-                    <input type="text" id="login-roll" placeholder="Enter Roll No" class="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white">
+                    <input type="text" id="login-roll" placeholder="Enter Roll No" autocomplete="off" class="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white">
                 </div>
                 
                 <div class="relative bg-black rounded-lg overflow-hidden h-64 border border-emerald-600 shadow-lg shadow-emerald-900/20">
@@ -117,6 +114,7 @@
             <div id="monitor-alert" class="hidden-section absolute top-4 right-4 bg-red-600 text-white p-4 rounded shadow-lg z-50 max-w-xs animate-pulse">
                 <p class="font-bold">⚠️ PROCTORING ALERT</p>
                 <p id="monitor-msg" class="text-sm mt-1">Face not detected!</p>
+                <p id="monitor-timer" class="text-xs mt-1 font-mono text-yellow-300">Auto-Close in: 120s</p>
             </div>
 
             <div id="monitor-box" class="hidden-section fixed bottom-4 right-4 w-40 h-32 bg-black border-2 border-slate-500 rounded-lg overflow-hidden shadow-2xl z-50">
@@ -136,7 +134,14 @@
             <div id="active-exam-paper" class="hidden-section mt-8 pt-6 border-t border-slate-700">
                 <h3 id="paper-title" class="text-3xl font-bold text-white mb-4"></h3>
                 <div id="questions-container" class="space-y-6"></div>
-                <div class="mt-8 flex gap-4">
+                
+                <div id="terminated-msg" class="hidden-section terminated-block mt-4">
+                    <h3 class="text-xl font-bold text-red-500">EXAM TERMINATED</h3>
+                    <p class="text-slate-400">Reason: <span id="term-reason">Suspicious Activity Detected</span></p>
+                    <button onclick="location.reload()" class="mt-4 bg-slate-700 text-white px-4 py-2 rounded">Return to Home</button>
+                </div>
+
+                <div class="mt-8 flex gap-4" id="exam-controls">
                     <button id="btn-submit" onclick="submitExam()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded">Submit Exam</button>
                     <button id="btn-close" onclick="closeExam()" class="hidden-section w-full bg-slate-700 text-white py-3 rounded">Return to List</button>
                 </div>
@@ -149,7 +154,9 @@
         let capturedImage = null;
         let examSchedule = {};
         let monitoringInterval = null; 
-        let completedExams = new Set(); // Track finished exams
+        let completedExams = new Set();
+        let warningSeconds = 0; 
+        const MAX_WARNING_TIME = 120; // 2 Minutes for Auto-Close
 
         const QUESTION_BANK = {
             "Blockchain": [
@@ -167,6 +174,13 @@
                 { q: "Library for Deep Learning?", options: ["React", "TensorFlow", "Pandas"], ans: "TensorFlow" }
             ]
         };
+
+        // --- HELPER: Clear Input Fields ---
+        function clearFields() {
+            document.getElementById('reg-roll').value = "";
+            document.getElementById('reg-name').value = "";
+            document.getElementById('login-roll').value = "";
+        }
 
         // --- NAVIGATION & CAMERA CONTROL ---
 
@@ -186,8 +200,8 @@
             document.querySelectorAll('[id^="section-"]').forEach(el => el.classList.add('hidden-section'));
             document.getElementById(id).classList.remove('hidden-section');
             
-            if(id === 'section-register') toggleInput('camera');
-            if(id === 'section-login') startLoginCamera();
+            if(id === 'section-register') { clearFields(); toggleInput('camera'); }
+            if(id === 'section-login') { clearFields(); startLoginCamera(); }
         }
 
         function logout() { 
@@ -199,15 +213,15 @@
 
         function startMonitoring() {
             console.log("Starting Exam Proctoring...");
-            document.getElementById('monitor-box').classList.remove('hidden-section'); // Show the box
+            document.getElementById('monitor-box').classList.remove('hidden-section'); 
+            warningSeconds = 0; // Reset warning timer
             
             navigator.mediaDevices.getUserMedia({video: true}).then(stream => {
                 document.getElementById('monitor-video').srcObject = stream;
                 
-                // Check face every 5 seconds
                 monitoringInterval = setInterval(async () => {
                     checkFacePresence();
-                }, 5000); 
+                }, 5000); // Check every 5 seconds
             }).catch(e => console.error("Proctoring Camera Failed", e));
         }
 
@@ -216,7 +230,7 @@
                 clearInterval(monitoringInterval);
                 monitoringInterval = null;
             }
-            document.getElementById('monitor-box').classList.add('hidden-section'); // Hide the box
+            document.getElementById('monitor-box').classList.add('hidden-section'); 
             let mv = document.getElementById('monitor-video');
             if(mv.srcObject) mv.srcObject.getTracks().forEach(t => t.stop());
         }
@@ -239,16 +253,47 @@
                 let data = await res.json();
                 let alertBox = document.getElementById('monitor-alert');
                 let alertMsg = document.getElementById('monitor-msg');
+                let timerMsg = document.getElementById('monitor-timer');
 
                 if (data.success) {
                     alertBox.classList.add('hidden-section');
+                    warningSeconds = 0; // User is present, reset warning
                 } else {
+                    // Face missing!
+                    warningSeconds += 5; // Add 5s to counter
                     alertMsg.innerText = data.message;
+                    timerMsg.innerText = `Auto-Close in: ${Math.max(0, MAX_WARNING_TIME - warningSeconds)}s`;
                     alertBox.classList.remove('hidden-section');
+
+                    if(warningSeconds >= MAX_WARNING_TIME) {
+                        terminateExam("Exceeded Warning Time Limit (2 Mins)");
+                    }
                 }
             } catch (e) {
                 console.log("Monitoring Error (Ignored)");
             }
+        }
+
+        async function terminateExam(reason) {
+            stopMonitoring();
+            // 1. Tell Backend to Log "Cheating"
+            await fetch(`${API_URL}/monitor_exam`, { 
+                method: 'POST', 
+                headers: {'Content-Type': 'application/json'}, 
+                body: JSON.stringify({ terminate: true, reason: reason }) 
+            });
+
+            // 2. Hide Exam, Show Termination Screen
+            document.getElementById('monitor-alert').classList.add('hidden-section');
+            document.getElementById('questions-container').classList.add('hidden-section');
+            document.getElementById('exam-controls').classList.add('hidden-section');
+            
+            document.getElementById('terminated-msg').classList.remove('hidden-section');
+            document.getElementById('term-reason').innerText = reason;
+            
+            // 3. Mark as completed locally so they can't restart immediately
+            let currentSubject = document.getElementById('paper-title').innerText;
+            completedExams.add(currentSubject);
         }
 
         // --- EXAM LOGIC ---
@@ -258,7 +303,7 @@
             let today = new Date().toISOString().split('T')[0];
             subs.forEach(s => {
                 let date = examSchedule[s] || "TBA";
-                let isCompleted = completedExams.has(s); // Check if exam is done
+                let isCompleted = completedExams.has(s); 
                 
                 let btn = "bg-slate-700 text-slate-500 cursor-not-allowed";
                 let disabled = "disabled";
@@ -284,14 +329,17 @@
         }
 
         async function startExam(sub) {
-            stopMonitoring(); // Reset monitoring to be safe
-            
+            stopMonitoring(); 
+            // Clean UI from previous exams/terminations
+            document.getElementById('terminated-msg').classList.add('hidden-section');
+            document.getElementById('questions-container').classList.remove('hidden-section');
+            document.getElementById('exam-controls').classList.remove('hidden-section');
+
             await fetch(`${API_URL}/mark_exam_verified`, {
                 method: 'POST', headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({ subject: sub })
             });
 
-            // Start Monitoring (Auto-Restart)
             startMonitoring();
 
             let qs = QUESTION_BANK[sub] || [];
@@ -300,7 +348,6 @@
             document.getElementById('paper-title').innerText = sub;
             let c = document.getElementById('questions-container'); c.innerHTML="";
             
-            // Render Questions
             qs.forEach((q,i) => {
                 let opts = q.options.map(o => `
                     <label class="block bg-slate-900 p-3 rounded mb-2 cursor-pointer border border-slate-700 hover:border-blue-500 transition">
@@ -318,9 +365,7 @@
         }
 
         function submitExam() {
-            stopMonitoring(); // Stop monitoring when done
-            
-            // Mark Exam as Completed
+            stopMonitoring(); 
             let currentSubject = document.getElementById('paper-title').innerText;
             completedExams.add(currentSubject);
 
@@ -328,23 +373,20 @@
             let blocks=document.querySelectorAll('.q-block');
             
             blocks.forEach(b => {
-                let ans = b.dataset.ans; // Correct Answer
+                let ans = b.dataset.ans; 
                 let inps = b.querySelectorAll('input');
                 let userSelected = null;
                 
-                // 1. Find what user selected & Disable all
                 inps.forEach(i => { 
                     if(i.checked) userSelected = i.value; 
                     i.disabled = true; 
                 });
 
-                // 2. Visual Grading Logic
                 if (userSelected === ans) {
                     score++;
-                    b.classList.add('correct-block'); // Green Border
+                    b.classList.add('correct-block'); 
                 } else {
-                    if(userSelected) b.classList.add('wrong-block'); // Red Border
-                    // Highlight correct answer
+                    if(userSelected) b.classList.add('wrong-block'); 
                     inps.forEach(i => {
                         if (i.value === ans) {
                             i.parentElement.classList.add('correct-option-highlight');
@@ -368,7 +410,7 @@
             if(window.studentSubjects) renderExamList(window.studentSubjects);
         }
 
-        // --- AUTH & COMMON UTILS ---
+        // --- AUTH & VALIDATION ---
 
         async function verifyMFA(uid, code) {
             let res = await fetch(`${API_URL}/verify-mfa`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id:uid, code:code})});
@@ -390,6 +432,33 @@
                     showSection('section-exam'); 
                 }
             } else alert("Invalid Code");
+        }
+
+        // Regex Validation
+        function isValidInput(type, val) {
+            if(type==='name') return /^[A-Z][a-z]{1,20}\s[A-Z][a-z]{1,20}$/.test(val); // Strict Title Case
+            if(type==='roll') return /^[A-Za-z0-9]{1,10}$/.test(val); // Alphanumeric, max 10
+            return true;
+        }
+
+        async function registerUser() { 
+            let roll=document.getElementById('reg-roll').value;
+            let name=document.getElementById('reg-name').value;
+            let subs=Array.from(document.querySelectorAll('.subject-cb:checked')).map(c=>c.value);
+            
+            // Client Validation Checks
+            if(!roll || !name || !capturedImage) return alert("Please fill all fields & capture photo.");
+            if(!isValidInput('name', name)) return alert("Invalid Name. Please use 'First Last' (e.g., Arsh Agrawal)");
+            if(!isValidInput('roll', roll)) return alert("Invalid Roll No. Use letters & numbers only.");
+
+            let r=await fetch(`${API_URL}/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:roll,name:name,roll_no:roll,exam_subjects:subs,image:capturedImage})});
+            let d=await r.json();
+            
+            if(d.mfa_uri){
+                document.getElementById('qrcode').innerHTML="";
+                new QRCode(document.getElementById('qrcode'),d.mfa_uri);
+                document.getElementById('mfa-popup').classList.remove('hidden-section');
+            } else alert(d.message);
         }
 
         function toggleInput(mode) { 
@@ -450,27 +519,10 @@
                     stopAllCameras();
                     let c=d.mfa_required?prompt("MFA Code:"):"000000";
                     if(c)verifyMFA(roll,c);
-                } else alert("❌ Face Mismatch or User Not Found");
+                } else alert(d.message || "❌ Login Failed");
             } catch(e){
                 alert("Server Error");
             }
-        }
-
-        async function registerUser() { 
-            let roll=document.getElementById('reg-roll').value;
-            let name=document.getElementById('reg-name').value;
-            let subs=Array.from(document.querySelectorAll('.subject-cb:checked')).map(c=>c.value);
-            
-            if(!roll||!capturedImage)return alert("Fill Data");
-            
-            let r=await fetch(`${API_URL}/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:roll,name:name,roll_no:roll,exam_subjects:subs,image:capturedImage})});
-            let d=await r.json();
-            
-            if(d.mfa_uri){
-                document.getElementById('qrcode').innerHTML="";
-                new QRCode(document.getElementById('qrcode'),d.mfa_uri);
-                document.getElementById('mfa-popup').classList.remove('hidden-section');
-            } else alert(d.message);
         }
     </script>
 </body>

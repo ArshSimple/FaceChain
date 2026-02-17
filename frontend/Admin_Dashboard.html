@@ -13,12 +13,10 @@
 <body class="h-screen flex overflow-hidden">
     <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col p-4">
         <h1 class="text-2xl font-bold text-white mb-8">FACE<span class="text-blue-500">CHAIN</span></h1>
-        
         <nav class="space-y-2 mb-auto">
             <div class="px-4 py-2 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20 text-xs font-bold">DASHBOARD</div>
             <a href="/" class="block px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded text-xs font-bold transition">👁️ STUDENT VIEW</a>
         </nav>
-
         <button onclick="logout()" class="w-full py-2 bg-red-900/20 text-red-400 border border-red-900/30 rounded text-xs font-bold hover:bg-red-900/40">LOGOUT</button>
     </aside>
 
@@ -53,7 +51,7 @@
                             <tr>
                                 <th class="p-3">Name</th>
                                 <th class="p-3">Roll No</th>
-                                <th class="p-3">Exam Status</th>
+                                <th class="p-3">Exam Status / Manage</th>
                                 <th class="p-3">MFA Control</th> 
                                 <th class="p-3 text-right">Action</th>
                             </tr>
@@ -72,16 +70,13 @@
 
     <script>
         let allUsers = [];
-
         async function loadData() {
             try {
                 let res = await fetch(`/admin/stats?t=${Date.now()}`);
                 if(res.status===401) return window.location.href="index.html";
                 let data = await res.json();
                 allUsers = data.user_list||[];
-                renderUsers(allUsers);
-                renderSchedule(data.schedule);
-                renderLogs(data.logs);
+                renderUsers(allUsers); renderSchedule(data.schedule); renderLogs(data.logs);
             } catch(e){}
         }
 
@@ -91,98 +86,60 @@
                     let verified = u.exams_verified && u.exams_verified.includes(s);
                     let color = verified ? "bg-blue-500/10 text-blue-400 border-blue-500/30" : "bg-slate-800 text-slate-500 border-slate-700";
                     let icon = verified ? "✓" : "○";
-                    return `<span class="px-2 py-1 text-[10px] border rounded mr-1 ${color}">${s} ${icon}</span>`;
+                    // Click to REMOVE Exam
+                    return `<button onclick="manageExam('${u.id}', '${s}', 'remove')" class="px-2 py-1 text-[10px] border rounded mr-1 ${color} hover:bg-red-900 hover:text-white" title="Click to Remove Exam">${s} ${icon}</button>`;
                 }).join('');
 
-                let mfaClass = u.mfa_enabled 
-                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" 
-                    : "bg-slate-700 text-slate-400 border-slate-600";
+                // Add Exam Button
+                let addBtn = `<button onclick="promptAddExam('${u.id}')" class="px-2 py-1 text-[10px] border border-slate-600 rounded bg-slate-800 hover:bg-blue-600 text-slate-400 hover:text-white">+ Add</button>`;
+
+                let mfaClass = u.mfa_enabled ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-slate-700 text-slate-400 border-slate-600";
                 let mfaText = u.mfa_enabled ? "ENABLED" : "DISABLED";
 
                 return `
                 <tr class="hover:bg-slate-800/50">
                     <td class="p-3 font-bold text-white">${u.name}</td>
                     <td class="p-3 font-mono text-blue-400">${u.roll_no}</td>
-                    <td class="p-3">${status || '<span class="text-slate-600">No Exams</span>'}</td>
-                    <td class="p-3">
-                        <button onclick="toggleMFA('${u.id}')" class="text-[10px] font-bold px-2 py-1 rounded border ${mfaClass}">
-                            ${mfaText}
-                        </button>
-                    </td>
-                    <td class="p-3 text-right">
-                        ${u.id!=='1' ? `<button onclick="deleteUser('${u.id}')" class="text-xs text-red-400 bg-red-900/20 px-2 py-1 rounded hover:bg-red-900/40 border border-red-900/30">DELETE</button>` : '<span class="text-xs text-slate-600">Admin</span>'}
-                    </td>
+                    <td class="p-3">${status} ${addBtn}</td>
+                    <td class="p-3"><button onclick="toggleMFA('${u.id}')" class="text-[10px] font-bold px-2 py-1 rounded border ${mfaClass}">${mfaText}</button></td>
+                    <td class="p-3 text-right">${u.id!=='1' ? `<button onclick="deleteUser('${u.id}')" class="text-xs text-red-400 bg-red-900/20 px-2 py-1 rounded hover:bg-red-900/40 border border-red-900/30">DELETE</button>` : '<span class="text-xs text-slate-600">Admin</span>'}</td>
                 </tr>`;
             }).join('');
         }
 
         function renderSchedule(sched) {
-            let html = "";
-            for(let [s,d] of Object.entries(sched)) {
-                html += `
-                <div class="flex justify-between items-center bg-slate-900 p-2 rounded border border-slate-800">
-                    <span class="text-white text-sm font-bold">${s}</span>
-                    <span class="text-emerald-400 font-mono text-xs">${d}</span>
-                    <button onclick="delSchedule('${s}')" class="text-red-500 text-xs hover:text-white">x</button>
-                </div>`;
-            }
+            let html = ""; for(let [s,d] of Object.entries(sched)) { html += `<div class="flex justify-between items-center bg-slate-900 p-2 rounded border border-slate-800"><span class="text-white text-sm font-bold">${s}</span><span class="text-emerald-400 font-mono text-xs">${d}</span><button onclick="delSchedule('${s}')" class="text-red-500 text-xs hover:text-white">x</button></div>`; }
             document.getElementById('schedule-list').innerHTML = html;
         }
 
         function renderLogs(logs) {
-            document.getElementById('logs-container').innerHTML = logs.map(l => 
-                `<div class="mb-1 border-b border-slate-900 pb-1">
-                    <span class="text-slate-600">[${l.timestamp}]</span> 
-                    <span class="${l.status==='SUCCESS'||l.status==='VERIFIED'?'text-emerald-400':'text-red-400'}">${l.action} : ${l.status}</span> 
-                    <span class="text-slate-500">(${l.user_id})</span>
-                </div>`
-            ).join('');
+            document.getElementById('logs-container').innerHTML = logs.map(l => `<div class="mb-1 border-b border-slate-900 pb-1"><span class="text-slate-600">[${l.timestamp}]</span> <span class="${l.status==='SUCCESS'||l.status==='VERIFIED'?'text-emerald-400':'text-red-400'}">${l.action} : ${l.status}</span> <span class="text-slate-500">(${l.user_id})</span></div>`).join('');
         }
 
-        async function setSchedule() {
-            let s = document.getElementById('sched-subject').value;
-            let d = document.getElementById('sched-date').value;
-            if(!d) return;
-            await fetch('/admin/set_schedule', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({subject:s, date:d})});
-            loadData();
-        }
-
-        async function delSchedule(s) {
-            if(confirm('Delete Schedule?')) {
-                await fetch('/admin/delete_schedule', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({subject:s})});
-                loadData();
-            }
-        }
-
-        async function deleteUser(id) {
-            if(confirm('Delete User?')) {
-                await fetch('/admin/user_ops', {
-                    method:'POST', 
-                    headers:{'Content-Type':'application/json'}, 
-                    body:JSON.stringify({user_id:id, action:'delete'})
+        async function manageExam(uid, sub, action) {
+            if(confirm(`${action.toUpperCase()} exam '${sub}' for user ${uid}?`)) {
+                await fetch('/admin/manage_user_exams', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({user_id: uid, subject: sub, action: action})
                 });
                 loadData();
             }
         }
 
-        async function toggleMFA(id) {
-            await fetch('/admin/user_ops', {
-                method:'POST', 
-                headers:{'Content-Type':'application/json'}, 
-                body:JSON.stringify({user_id:id, action:'toggle_mfa'})
-            });
-            loadData();
+        async function promptAddExam(uid) {
+            let sub = prompt("Enter Subject Name to Add (e.g. AI/ML, Blockchain):");
+            if(sub) manageExam(uid, sub, 'add');
         }
 
-        function filterUsers() {
-            let t = document.getElementById('userSearch').value.toLowerCase();
-            renderUsers(allUsers.filter(u => u.name.toLowerCase().includes(t) || u.roll_no.toLowerCase().includes(t)));
-        }
-
+        async function setSchedule() { let s = document.getElementById('sched-subject').value; let d = document.getElementById('sched-date').value; if(!d) return; await fetch('/admin/set_schedule', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({subject:s, date:d})}); loadData(); }
+        async function delSchedule(s) { if(confirm('Delete Schedule?')) { await fetch('/admin/delete_schedule', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({subject:s})}); loadData(); } }
+        async function deleteUser(id) { if(confirm('Delete User?')) { await fetch('/admin/user_ops', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id:id, action:'delete'}) }); loadData(); } }
+        async function toggleMFA(id) { await fetch('/admin/user_ops', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id:id, action:'toggle_mfa'}) }); loadData(); }
+        function filterUsers() { let t = document.getElementById('userSearch').value.toLowerCase(); renderUsers(allUsers.filter(u => u.name.toLowerCase().includes(t) || u.roll_no.toLowerCase().includes(t))); }
         async function logout() { await fetch('/logout'); window.location.href="index.html"; }
         
-        loadData();
-        setInterval(loadData, 5000);
+        loadData(); setInterval(loadData, 5000);
     </script>
 </body>
 </html>
