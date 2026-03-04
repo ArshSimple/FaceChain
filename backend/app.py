@@ -55,17 +55,10 @@ def json_resp(success=True, data=None, msg="", code=200):
     return jsonify(payload), code
 
 def validate_input(text, type="name"):
-    """Server-side validation helper (Stricter)"""
     if type == "name":
-        # Regex: Start with Capital, lowercase letters, Space, Start with Capital, lowercase letters
-        # Accepts: "Arsh Agrawal"
-        # Rejects: "arsh agrawal", "Arsh123", "adhkkhdgkdg"
         return bool(re.match(r"^[A-Z][a-z]{1,20}\s[A-Z][a-z]{1,20}$", text))
-    
     if type == "roll":
-        # Alphanumeric only, max 10 chars to prevent spam
         return bool(re.match(r"^[A-Za-z0-9]{1,10}$", text))
-        
     return True
 
 # ==========================================
@@ -84,7 +77,6 @@ def register():
         d = request.json
         uid, name, img = d.get('user_id'), d.get('name'), d.get('image')
         
-        # --- VALIDATION CHECKS ---
         if not validate_input(name, "name"):
             return json_resp(False, msg="Invalid Name. Must be Title Case (e.g., 'Arsh Agrawal')", code=400)
         if not validate_input(uid, "roll"):
@@ -120,11 +112,18 @@ def login():
         ledger.add_log(uid, "LOGIN_ATTEMPT", "USER_NOT_FOUND", request.remote_addr)
         return json_resp(False, msg="User Not Found", code=200)
 
-    # Check if account was soft-deleted
     if not USER_DB[uid].get('encoding'):
         return json_resp(False, msg="Account Deactivated/Deleted", code=200)
 
-    encoding = face_utils.get_face_embedding(face_utils.decode_image(d.get('image')))
+    raw_image = d.get('image')
+    if not raw_image:
+        return json_resp(False, msg="No Image Received", code=400)
+
+    decoded_frame = face_utils.decode_image(raw_image)
+    if decoded_frame is None:
+        return json_resp(False, msg="Image Decode Failed", code=400)
+    
+    encoding = face_utils.get_face_embedding(decoded_frame)
     if encoding is None: return json_resp(False, msg="No Face Visible", code=200)
     
     match_id, _ = face_utils.find_match(encoding)
@@ -164,18 +163,32 @@ def monitor_exam():
     uid = session.get('user_id')
     img_data = request.json.get('image')
     
+    # --- NEW: Check if the frontend wants us to log this specific check ---
+    log_warning = request.json.get('log_warning', True) 
+    
     if request.json.get('terminate'):
         reason = request.json.get('reason', 'Unknown Violation')
+        subject = request.json.get('subject') 
+        
+        if subject:
+            if 'terminated_exams' not in USER_DB[uid]:
+                USER_DB[uid]['terminated_exams'] = []
+            if subject not in USER_DB[uid]['terminated_exams']:
+                USER_DB[uid]['terminated_exams'].append(subject)
+            save_db()
+
         ledger.add_log(uid, "EXAM_TERMINATED", f"CHEATING: {reason}", request.remote_addr)
         return json_resp(True, msg="Exam Terminated")
 
     try:
         current_frame = face_utils.decode_image(img_data)
+        if current_frame is None: return json_resp(False, msg="Frame Error")
         current_encoding = face_utils.get_face_embedding(current_frame)
     except: return json_resp(False, msg="Frame Error")
 
     if current_encoding is None:
-        ledger.add_log(uid, "MONITORING", "FACE_MISSING", request.remote_addr)
+        # --- NEW: Only log to blockchain if log_warning is True ---
+        if log_warning: ledger.add_log(uid, "MONITORING", "FACE_MISSING", request.remote_addr)
         return json_resp(False, msg="⚠️ Warning: No face detected!")
 
     stored_data = USER_DB.get(uid)
@@ -184,7 +197,8 @@ def monitor_exam():
     if face_utils.face_recognition.compare_faces([stored_data['encoding']], current_encoding, tolerance=0.5)[0]:
         return json_resp(True, msg="Verified")
     else:
-        ledger.add_log(uid, "MONITORING", "FRAUD_DETECTED", request.remote_addr)
+        # --- NEW: Only log to blockchain if log_warning is True ---
+        if log_warning: ledger.add_log(uid, "MONITORING", "FRAUD_DETECTED", request.remote_addr)
         return json_resp(False, msg="⚠️ ALARM: Wrong Person!")
 
 @app.route('/mark_exam_verified', methods=['POST'])
@@ -224,10 +238,14 @@ def manage_user_exams():
     return json_resp(True)
 
 @app.route('/admin/stats')
+@limiter.exempt 
 def admin_stats():
     if session.get('role') != 'admin': return json_resp(False, code=401)
+    
     users = [{"id": k, "name": v["name"], "roll_no": v["roll_no"], 
-              "exam_subjects": v["exam_subjects"], "exams_verified": v["exams_verified"],
+              "exam_subjects": v["exam_subjects"], 
+              "exams_verified": v["exams_verified"],
+              "terminated_exams": v.get("terminated_exams", []), 
               "mfa_enabled": v.get("mfa_enabled", True)} for k, v in USER_DB.items()]
     return json_resp(True, {"total": len(USER_DB), "user_list": users, "logs": ledger.get_logs(), "schedule": load_sched()})
 

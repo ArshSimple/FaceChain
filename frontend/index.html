@@ -55,7 +55,6 @@
                         <label class="flex items-center gap-2"><input type="checkbox" class="subject-cb" value="AI/ML"> AI/ML</label>
                     </div>
                 </div>
-                
                 <div>
                     <div class="flex gap-2 mb-2">
                         <button onclick="toggleInput('camera')" class="px-4 py-1 bg-blue-600 text-white rounded text-sm">Webcam</button>
@@ -73,7 +72,6 @@
                     <button onclick="captureFace()" id="btn-capture" class="mt-2 w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded">Capture</button>
                     <p id="capture-status" class="hidden-section text-center text-emerald-400 mt-2">✅ Photo Ready</p>
                 </div>
-
                 <div class="flex gap-4">
                     <button onclick="location.reload()" class="w-1/3 bg-slate-700 text-white py-3 rounded">Cancel</button>
                     <button onclick="registerUser()" class="w-2/3 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded">Register</button>
@@ -88,12 +86,10 @@
                     <label class="block text-slate-400 mb-2">Roll Number</label>
                     <input type="text" id="login-roll" placeholder="Enter Roll No" autocomplete="off" class="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white">
                 </div>
-                
                 <div class="relative bg-black rounded-lg overflow-hidden h-64 border border-emerald-600 shadow-lg shadow-emerald-900/20">
                     <video id="login-video" class="w-full h-full object-cover mirror-mode" autoplay playsinline></video>
                     <div class="absolute inset-0 border-2 border-emerald-500/30 m-8 rounded-lg pointer-events-none"></div>
                 </div>
-
                 <div class="flex gap-4">
                     <button onclick="location.reload()" class="w-1/3 bg-slate-700 text-white py-3 rounded">Back</button>
                     <button onclick="performLogin()" class="w-2/3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded">Authenticate</button>
@@ -110,37 +106,30 @@
         </div>
 
         <div id="section-exam" class="hidden-section bg-slate-800 p-8 rounded-2xl border border-slate-700 relative">
-            
             <div id="monitor-alert" class="hidden-section absolute top-4 right-4 bg-red-600 text-white p-4 rounded shadow-lg z-50 max-w-xs animate-pulse">
                 <p class="font-bold">⚠️ PROCTORING ALERT</p>
                 <p id="monitor-msg" class="text-sm mt-1">Face not detected!</p>
                 <p id="monitor-timer" class="text-xs mt-1 font-mono text-yellow-300">Auto-Close in: 120s</p>
             </div>
-
             <div id="monitor-box" class="hidden-section fixed bottom-4 right-4 w-40 h-32 bg-black border-2 border-slate-500 rounded-lg overflow-hidden shadow-2xl z-50">
                 <video id="monitor-video" class="w-full h-full object-cover mirror-mode" autoplay playsinline muted></video>
                 <div class="absolute bottom-0 w-full bg-black/50 text-xs text-center text-white py-1">Proctoring Active</div>
             </div>
-
             <div class="flex justify-between items-center border-b border-slate-700 pb-4 mb-6">
                 <h2 class="text-2xl font-bold text-white">Student Dashboard</h2>
                 <div class="text-right">
                     <p class="text-slate-400">Roll No: <span id="student-id-display" class="text-blue-400 font-mono">--</span></p>
                 </div>
             </div>
-            
             <div id="exam-list" class="space-y-4"></div>
-            
             <div id="active-exam-paper" class="hidden-section mt-8 pt-6 border-t border-slate-700">
                 <h3 id="paper-title" class="text-3xl font-bold text-white mb-4"></h3>
                 <div id="questions-container" class="space-y-6"></div>
-                
                 <div id="terminated-msg" class="hidden-section terminated-block mt-4">
                     <h3 class="text-xl font-bold text-red-500">EXAM TERMINATED</h3>
                     <p class="text-slate-400">Reason: <span id="term-reason">Suspicious Activity Detected</span></p>
                     <button onclick="location.reload()" class="mt-4 bg-slate-700 text-white px-4 py-2 rounded">Return to Home</button>
                 </div>
-
                 <div class="mt-8 flex gap-4" id="exam-controls">
                     <button id="btn-submit" onclick="submitExam()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded">Submit Exam</button>
                     <button id="btn-close" onclick="closeExam()" class="hidden-section w-full bg-slate-700 text-white py-3 rounded">Return to List</button>
@@ -149,14 +138,18 @@
         </div>
     </div>
 
-    <script>
+   <script>
         const API_URL = "http://127.0.0.1:5000";
         let capturedImage = null;
         let examSchedule = {};
         let monitoringInterval = null; 
         let completedExams = new Set();
-        let warningSeconds = 0; 
-        const MAX_WARNING_TIME = 120; // 2 Minutes for Auto-Close
+        
+        // --- HIGH-PERFORMANCE PROCTORING VARIABLES ---
+        let warningTimeLeft = 120; 
+        let isCheating = false; 
+        let isProcessing = false; // Prevents lag if AI is slow
+        let secondsSinceLastLog = 30; // Starts at 30 so the FIRST warning logs instantly
 
         const QUESTION_BANK = {
             "Blockchain": [
@@ -175,14 +168,11 @@
             ]
         };
 
-        // --- HELPER: Clear Input Fields ---
         function clearFields() {
             document.getElementById('reg-roll').value = "";
             document.getElementById('reg-name').value = "";
             document.getElementById('login-roll').value = "";
         }
-
-        // --- NAVIGATION & CAMERA CONTROL ---
 
         function stopAllCameras() {
             document.querySelectorAll('video').forEach(vid => {
@@ -209,35 +199,64 @@
             fetch('/logout').then(() => location.reload());
         }
 
-        // --- MONITORING LOGIC ---
+        // --- 🚀 NEW PROCTORING ENGINE ---
 
         function startMonitoring() {
             console.log("Starting Exam Proctoring...");
             document.getElementById('monitor-box').classList.remove('hidden-section'); 
-            warningSeconds = 0; // Reset warning timer
             
+            warningTimeLeft = 120; 
+            isCheating = false;
+            secondsSinceLastLog = 30; 
+            isProcessing = false;
+
             navigator.mediaDevices.getUserMedia({video: true}).then(stream => {
                 document.getElementById('monitor-video').srcObject = stream;
                 
+                // SINGLE MASTER LOOP: Ticks every 1 second exactly
                 monitoringInterval = setInterval(async () => {
-                    checkFacePresence();
-                }, 5000); // Check every 5 seconds
+                    
+                    // 1. UI WARNING TICKDOWN (Instantly responsive)
+                    if (isCheating) {
+                        warningTimeLeft--; 
+                        let alertBox = document.getElementById('monitor-alert');
+                        let timerMsg = document.getElementById('monitor-timer');
+                        
+                        if(alertBox) alertBox.classList.remove('hidden-section');
+                        if(timerMsg) timerMsg.innerText = `Auto-Close in: ${warningTimeLeft}s`;
+                        
+                        if (warningTimeLeft <= 0) {
+                            terminateExam("Face missing or mismatched for 120 seconds");
+                            return; 
+                        }
+                    }
+
+                    // 2. AI VERIFICATION (Runs every second, prevents overlap lag)
+                    if (!isProcessing) {
+                        isProcessing = true;
+                        
+                        // Only permission to log to blockchain if 30s have passed
+                        let permissionToLog = (secondsSinceLastLog >= 30);
+                        
+                        await checkFacePresence(permissionToLog);
+                        isProcessing = false;
+                    }
+
+                }, 1000); // 1000ms = 1 Second
+
             }).catch(e => console.error("Proctoring Camera Failed", e));
         }
 
         function stopMonitoring() {
-            if (monitoringInterval) {
-                clearInterval(monitoringInterval);
-                monitoringInterval = null;
-            }
+            if (monitoringInterval) { clearInterval(monitoringInterval); monitoringInterval = null; }
             document.getElementById('monitor-box').classList.add('hidden-section'); 
             let mv = document.getElementById('monitor-video');
-            if(mv.srcObject) mv.srcObject.getTracks().forEach(t => t.stop());
+            if(mv && mv.srcObject) mv.srcObject.getTracks().forEach(t => t.stop());
         }
 
-        async function checkFacePresence() {
+        async function checkFacePresence(permissionToLog) {
             let v = document.getElementById('monitor-video');
-            if (!v.srcObject) return;
+            if (!v || !v.srcObject) return;
 
             let c = document.createElement('canvas');
             c.width = v.videoWidth; c.height = v.videoHeight;
@@ -248,25 +267,29 @@
                 let res = await fetch(`${API_URL}/monitor_exam`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ image: img })
+                    body: JSON.stringify({ image: img, log_warning: permissionToLog }) // Send Throttle Flag
                 });
                 let data = await res.json();
+
                 let alertBox = document.getElementById('monitor-alert');
                 let alertMsg = document.getElementById('monitor-msg');
-                let timerMsg = document.getElementById('monitor-timer');
 
                 if (data.success) {
-                    alertBox.classList.add('hidden-section');
-                    warningSeconds = 0; // User is present, reset warning
+                    // ✅ VERIFIED: Student is looking. Reset everything instantly.
+                    isCheating = false;
+                    warningTimeLeft = 120; 
+                    secondsSinceLastLog = 30; // Resets so next offense logs instantly
+                    if (alertBox) alertBox.classList.add('hidden-section');
                 } else {
-                    // Face missing!
-                    warningSeconds += 5; // Add 5s to counter
-                    alertMsg.innerText = data.message;
-                    timerMsg.innerText = `Auto-Close in: ${Math.max(0, MAX_WARNING_TIME - warningSeconds)}s`;
-                    alertBox.classList.remove('hidden-section');
-
-                    if(warningSeconds >= MAX_WARNING_TIME) {
-                        terminateExam("Exceeded Warning Time Limit (2 Mins)");
+                    // ❌ FAILED: Face missing/mismatch
+                    isCheating = true;
+                    if (alertMsg) alertMsg.innerText = data.message || "⚠️ Face not recognized!";
+                    
+                    // Manage the 30-second Blockchain Cooldown
+                    if (permissionToLog) {
+                        secondsSinceLastLog = 0; // Just logged, reset cooldown timer
+                    } else {
+                        secondsSinceLastLog++; // Count up until 30 again
                     }
                 }
             } catch (e) {
@@ -275,15 +298,15 @@
         }
 
         async function terminateExam(reason) {
-            stopMonitoring();
-            // 1. Tell Backend to Log "Cheating"
+            stopMonitoring(); 
+            let currentSubject = document.getElementById('paper-title').innerText;
+
             await fetch(`${API_URL}/monitor_exam`, { 
                 method: 'POST', 
                 headers: {'Content-Type': 'application/json'}, 
-                body: JSON.stringify({ terminate: true, reason: reason }) 
+                body: JSON.stringify({ terminate: true, reason: reason, subject: currentSubject }) 
             });
 
-            // 2. Hide Exam, Show Termination Screen
             document.getElementById('monitor-alert').classList.add('hidden-section');
             document.getElementById('questions-container').classList.add('hidden-section');
             document.getElementById('exam-controls').classList.add('hidden-section');
@@ -291,8 +314,6 @@
             document.getElementById('terminated-msg').classList.remove('hidden-section');
             document.getElementById('term-reason').innerText = reason;
             
-            // 3. Mark as completed locally so they can't restart immediately
-            let currentSubject = document.getElementById('paper-title').innerText;
             completedExams.add(currentSubject);
         }
 
@@ -330,7 +351,6 @@
 
         async function startExam(sub) {
             stopMonitoring(); 
-            // Clean UI from previous exams/terminations
             document.getElementById('terminated-msg').classList.add('hidden-section');
             document.getElementById('questions-container').classList.remove('hidden-section');
             document.getElementById('exam-controls').classList.remove('hidden-section');
@@ -434,10 +454,9 @@
             } else alert("Invalid Code");
         }
 
-        // Regex Validation
         function isValidInput(type, val) {
-            if(type==='name') return /^[A-Z][a-z]{1,20}\s[A-Z][a-z]{1,20}$/.test(val); // Strict Title Case
-            if(type==='roll') return /^[A-Za-z0-9]{1,10}$/.test(val); // Alphanumeric, max 10
+            if(type==='name') return /^[A-Z][a-z]{1,20}\s[A-Z][a-z]{1,20}$/.test(val); 
+            if(type==='roll') return /^[A-Za-z0-9]{1,10}$/.test(val); 
             return true;
         }
 
@@ -446,7 +465,6 @@
             let name=document.getElementById('reg-name').value;
             let subs=Array.from(document.querySelectorAll('.subject-cb:checked')).map(c=>c.value);
             
-            // Client Validation Checks
             if(!roll || !name || !capturedImage) return alert("Please fill all fields & capture photo.");
             if(!isValidInput('name', name)) return alert("Invalid Name. Please use 'First Last' (e.g., Arsh Agrawal)");
             if(!isValidInput('roll', roll)) return alert("Invalid Roll No. Use letters & numbers only.");

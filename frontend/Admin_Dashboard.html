@@ -20,10 +20,10 @@
         <button onclick="logout()" class="w-full py-2 bg-red-900/20 text-red-400 border border-red-900/30 rounded text-xs font-bold hover:bg-red-900/40">LOGOUT</button>
     </aside>
 
-    <main class="flex-1 flex flex-col">
+    <main class="flex-1 flex flex-col relative">
         <header class="h-16 border-b border-slate-800 flex items-center justify-between px-8 bg-slate-900">
             <div class="text-xs font-bold text-emerald-500">● SYSTEM ONLINE</div>
-            <button onclick="loadData()" class="text-xs bg-slate-800 text-white px-3 py-1 rounded border border-slate-600 hover:bg-slate-700">REFRESH DATA</button>
+            <button onclick="loadData()" class="text-xs bg-slate-800 text-white px-3 py-1 rounded border border-slate-600 hover:bg-slate-700">FORCE REFRESH</button>
         </header>
 
         <div class="flex-1 overflow-y-auto p-8 space-y-6">
@@ -62,84 +62,142 @@
             </div>
             
             <div class="glass p-6 rounded">
-                <h3 class="font-bold text-white mb-2">🛡️ Security Logs</h3>
-                <div id="logs-container" class="bg-black h-48 overflow-y-auto p-4 text-xs font-mono text-slate-500"></div>
+                <h3 class="font-bold text-white mb-2">🛡️ Security Logs (Blockchain)</h3>
+                <div id="logs-container" class="bg-black h-48 overflow-y-auto p-4 text-xs font-mono text-slate-500">
+                    <div class="text-center mt-10">Waiting for Data...</div>
+                </div>
             </div>
         </div>
+
+        <div id="examModal" class="hidden absolute inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm">
+            <div class="glass p-6 rounded border border-slate-700 w-80 shadow-2xl">
+                <h3 class="text-white font-bold mb-4 text-center">Add Subject to Student</h3>
+                <select id="modal-subject" class="w-full bg-slate-950 border border-slate-700 text-white p-2 rounded text-xs mb-6 focus:outline-none focus:border-blue-500">
+                    <option value="Network Security">Network Security</option>
+                    <option value="Blockchain">Blockchain</option>
+                    <option value="AI/ML">AI/ML</option>
+                </select>
+                <div class="flex justify-between gap-2">
+                    <button onclick="closeModal()" class="w-1/2 px-4 py-2 bg-slate-800 text-slate-300 rounded text-xs font-bold hover:bg-slate-700">Cancel</button>
+                    <button onclick="submitNewExam()" class="w-1/2 px-4 py-2 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-500">Add Exam</button>
+                </div>
+            </div>
+        </div>
+
     </main>
 
     <script>
         let allUsers = [];
+        let activeUserId = null; // Stores the user ID when the modal is open
+
         async function loadData() {
             try {
                 let res = await fetch(`/admin/stats?t=${Date.now()}`);
-                if(res.status===401) return window.location.href="index.html";
+                if(res.status === 401) { window.location.href = "index.html"; return; }
+                
                 let data = await res.json();
-                allUsers = data.user_list||[];
-                renderUsers(allUsers); renderSchedule(data.schedule); renderLogs(data.logs);
-            } catch(e){}
+                allUsers = data.user_list || [];
+                renderUsers(allUsers);
+                
+                if(data.schedule) renderSchedule(data.schedule);
+                if(data.logs) renderLogs(data.logs);
+            } catch(e) { console.error("Connection Error:", e); }
         }
 
         function renderUsers(users) {
-            document.getElementById('userTableBody').innerHTML = users.map(u => {
+            const tbody = document.getElementById('userTableBody');
+            if(!users || users.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-500">No users found</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = users.map(u => {
                 let status = u.exam_subjects.map(s => {
-                    let verified = u.exams_verified && u.exams_verified.includes(s);
-                    let color = verified ? "bg-blue-500/10 text-blue-400 border-blue-500/30" : "bg-slate-800 text-slate-500 border-slate-700";
-                    let icon = verified ? "✓" : "○";
-                    // Click to REMOVE Exam
-                    return `<button onclick="manageExam('${u.id}', '${s}', 'remove')" class="px-2 py-1 text-[10px] border rounded mr-1 ${color} hover:bg-red-900 hover:text-white" title="Click to Remove Exam">${s} ${icon}</button>`;
+                    let isTerminated = u.terminated_exams && u.terminated_exams.includes(s);
+                    let isVerified = u.exams_verified && u.exams_verified.includes(s);
+                    let color = "bg-slate-800 text-slate-500 border-slate-700";
+                    let icon = "○"; let title = "Not Started";
+
+                    if (isTerminated) { color = "bg-red-900/30 text-red-400 border-red-900/50"; icon = "❌"; title = "Terminated"; } 
+                    else if (isVerified) { color = "bg-blue-500/10 text-blue-400 border-blue-500/30"; icon = "✓"; title = "Verified"; }
+                    
+                    return `<button onclick="manageExam('${u.id}', '${s}', 'remove')" class="px-2 py-1 text-[10px] border rounded mr-1 ${color} hover:bg-red-900 hover:text-white" title="${title}">${s} ${icon}</button>`;
                 }).join('');
 
-                // Add Exam Button
+                // Changed promptAddExam to trigger our custom modal
                 let addBtn = `<button onclick="promptAddExam('${u.id}')" class="px-2 py-1 text-[10px] border border-slate-600 rounded bg-slate-800 hover:bg-blue-600 text-slate-400 hover:text-white">+ Add</button>`;
-
                 let mfaClass = u.mfa_enabled ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-slate-700 text-slate-400 border-slate-600";
-                let mfaText = u.mfa_enabled ? "ENABLED" : "DISABLED";
-
+                
                 return `
                 <tr class="hover:bg-slate-800/50">
                     <td class="p-3 font-bold text-white">${u.name}</td>
                     <td class="p-3 font-mono text-blue-400">${u.roll_no}</td>
                     <td class="p-3">${status} ${addBtn}</td>
-                    <td class="p-3"><button onclick="toggleMFA('${u.id}')" class="text-[10px] font-bold px-2 py-1 rounded border ${mfaClass}">${mfaText}</button></td>
+                    <td class="p-3"><button onclick="toggleMFA('${u.id}')" class="text-[10px] font-bold px-2 py-1 rounded border ${mfaClass}">${u.mfa_enabled ? "ENABLED" : "DISABLED"}</button></td>
                     <td class="p-3 text-right">${u.id!=='1' ? `<button onclick="deleteUser('${u.id}')" class="text-xs text-red-400 bg-red-900/20 px-2 py-1 rounded hover:bg-red-900/40 border border-red-900/30">DELETE</button>` : '<span class="text-xs text-slate-600">Admin</span>'}</td>
                 </tr>`;
             }).join('');
         }
 
         function renderSchedule(sched) {
-            let html = ""; for(let [s,d] of Object.entries(sched)) { html += `<div class="flex justify-between items-center bg-slate-900 p-2 rounded border border-slate-800"><span class="text-white text-sm font-bold">${s}</span><span class="text-emerald-400 font-mono text-xs">${d}</span><button onclick="delSchedule('${s}')" class="text-red-500 text-xs hover:text-white">x</button></div>`; }
+            let html = "";
+            for(let [s,d] of Object.entries(sched)) {
+                html += `
+                <div class="flex justify-between items-center bg-slate-900 p-2 rounded border border-slate-800 hover:border-slate-600 transition">
+                    <span class="text-white text-sm font-bold flex-1">${s}</span>
+                    <input type="date" value="${d}" onchange="updateSchedule('${s}', this.value)" class="bg-transparent text-emerald-400 font-mono text-xs cursor-pointer focus:outline-none border-b border-transparent hover:border-emerald-500 px-2">
+                    <button onclick="delSchedule('${s}')" class="text-red-500 text-xs hover:text-white hover:bg-red-900/50 px-2 py-1 rounded ml-2">❌</button>
+                </div>`;
+            }
             document.getElementById('schedule-list').innerHTML = html;
         }
 
         function renderLogs(logs) {
-            document.getElementById('logs-container').innerHTML = logs.map(l => `<div class="mb-1 border-b border-slate-900 pb-1"><span class="text-slate-600">[${l.timestamp}]</span> <span class="${l.status==='SUCCESS'||l.status==='VERIFIED'?'text-emerald-400':'text-red-400'}">${l.action} : ${l.status}</span> <span class="text-slate-500">(${l.user_id})</span></div>`).join('');
+            const container = document.getElementById('logs-container');
+            if(!logs || logs.length === 0) {
+                container.innerHTML = '<div class="text-center mt-4 text-slate-600">No logs found yet.</div>';
+                return;
+            }
+            container.innerHTML = logs.map(l => 
+                `<div class="mb-1 border-b border-slate-900 pb-1 font-mono hover:bg-slate-900/50">
+                    <span class="text-slate-600">[${l.timestamp}]</span> 
+                    <span class="${(l.status.includes('SUCCESS') || l.status.includes('MATCH')) ? 'text-emerald-400' : 'text-red-400'}">${l.action} : ${l.status}</span> 
+                    <span class="text-slate-500">(${l.user_id})</span>
+                </div>`
+            ).join('');
         }
 
-        async function manageExam(uid, sub, action) {
-            if(confirm(`${action.toUpperCase()} exam '${sub}' for user ${uid}?`)) {
-                await fetch('/admin/manage_user_exams', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({user_id: uid, subject: sub, action: action})
-                });
-                loadData();
+        // --- NEW MODAL LOGIC ---
+        function promptAddExam(uid) { 
+            activeUserId = uid; 
+            document.getElementById('examModal').classList.remove('hidden'); 
+        }
+
+        function closeModal() { 
+            activeUserId = null; 
+            document.getElementById('examModal').classList.add('hidden'); 
+        }
+
+        function submitNewExam() {
+            let s = document.getElementById('modal-subject').value;
+            if(s && activeUserId) {
+                manageExam(activeUserId, s, 'add');
+                closeModal();
             }
         }
 
-        async function promptAddExam(uid) {
-            let sub = prompt("Enter Subject Name to Add (e.g. AI/ML, Blockchain):");
-            if(sub) manageExam(uid, sub, 'add');
-        }
-
-        async function setSchedule() { let s = document.getElementById('sched-subject').value; let d = document.getElementById('sched-date').value; if(!d) return; await fetch('/admin/set_schedule', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({subject:s, date:d})}); loadData(); }
+        // --- API ACTIONS ---
+        async function manageExam(uid, sub, action) { if(action === 'add' || confirm(`Remove exam '${sub}' from user?`)) { await fetch('/admin/manage_user_exams', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: uid, subject: sub, action: action}) }); loadData(); } }
+        async function setSchedule() { let s = document.getElementById('sched-subject').value; let d = document.getElementById('sched-date').value; if(d) updateSchedule(s, d); }
+        async function updateSchedule(s, d) { await fetch('/admin/set_schedule', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({subject:s, date:d})}); loadData(); }
         async function delSchedule(s) { if(confirm('Delete Schedule?')) { await fetch('/admin/delete_schedule', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({subject:s})}); loadData(); } }
         async function deleteUser(id) { if(confirm('Delete User?')) { await fetch('/admin/user_ops', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id:id, action:'delete'}) }); loadData(); } }
         async function toggleMFA(id) { await fetch('/admin/user_ops', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({user_id:id, action:'toggle_mfa'}) }); loadData(); }
         function filterUsers() { let t = document.getElementById('userSearch').value.toLowerCase(); renderUsers(allUsers.filter(u => u.name.toLowerCase().includes(t) || u.roll_no.toLowerCase().includes(t))); }
         async function logout() { await fetch('/logout'); window.location.href="index.html"; }
         
-        loadData(); setInterval(loadData, 5000);
+        loadData();
+        setInterval(loadData, 5000); // Auto-Refresh every 5 seconds
     </script>
 </body>
 </html>

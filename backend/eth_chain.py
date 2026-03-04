@@ -16,7 +16,9 @@ GANACHE_URL = "http://127.0.0.1:7545"
 
 class EthLedger:
     def __init__(self):
-        self.w3 = Web3(Web3.HTTPProvider(GANACHE_URL))
+        self.local_logs = [] 
+        
+        self.w3 = Web3(Web3.HTTPProvider(GANACHE_URL, request_kwargs={'timeout': 60}))
         self.account = None
         self.contract = None
         
@@ -28,45 +30,52 @@ class EthLedger:
             print("❌ Blockchain Connection Failed. Is Ganache running?")
 
     def setup_contract(self):
-        # 1. Check if we have an existing address
+        deploy_new = True # Assume we need a new contract unless proven otherwise
+
+        # 1. Check if we have an existing address saved
         if os.path.exists(CONTRACT_ADDRESS_FILE):
             try:
                 with open(CONTRACT_ADDRESS_FILE, 'r') as f:
                     address = f.read().strip()
                 
-                if not Web3.is_address(address): raise ValueError("Invalid address")
+                if Web3.is_address(address):
+                    # --- THE FIX: Check if the contract actually exists on Ganache right now ---
+                    contract_code = self.w3.eth.get_code(address)
+                    
+                    if len(contract_code) > 2: # If length > 2, it's not empty ('0x')
+                        abi = self.compile_contract_abi()
+                        if abi:
+                            self.contract = self.w3.eth.contract(address=address, abi=abi)
+                            print(f"🔗 Reconnected to Existing Contract: {address}")
+                            deploy_new = False
+                    else:
+                        print("⚠️ Ganache was restarted. Old contract is gone. Preparing new deployment...")
+            except Exception as e: 
+                pass
 
-                abi = self.compile_contract_abi()
-                if abi:
-                    self.contract = self.w3.eth.contract(address=address, abi=abi)
-                    print(f"🔗 Connected to Smart Contract: {address}")
-                    return
-            except Exception as e:
-                print(f"⚠️ Contract Load Error: {e}")
+        # 2. Deploy New if needed (Ganache restarted OR first run)
+        if deploy_new:
+            print("⚙️  Compiling & Deploying New Contract...")
+            abi, bytecode = self.compile_contract_full()
+            if not abi or not bytecode: return
 
-        # 2. Deploy New if needed
-        print("⚙️  Compiling & Deploying New Contract...")
-        abi, bytecode = self.compile_contract_full()
-        if not abi or not bytecode: return
-
-        try:
-            FaceAuth = self.w3.eth.contract(abi=abi, bytecode=bytecode)
-            tx_hash = FaceAuth.constructor().transact({'from': self.account})
-            tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
-            
-            contract_address = tx_receipt.contractAddress
-            self.contract = self.w3.eth.contract(address=contract_address, abi=abi)
-            
-            with open(CONTRACT_ADDRESS_FILE, 'w') as f:
-                f.write(contract_address)
+            try:
+                FaceAuth = self.w3.eth.contract(abi=abi, bytecode=bytecode)
+                tx_hash = FaceAuth.constructor().transact({'from': self.account})
+                tx_receipt = self.w3.eth.wait_for_transaction_receipt(tx_hash)
                 
-            print(f"✅ New Contract Deployed at: {contract_address}")
-            
-            # Add a startup log
-            self.add_log("SYSTEM", "CONTRACT_DEPLOY", "SUCCESS", "127.0.0.1")
-            
-        except Exception as e:
-            print(f"❌ Deployment Failed: {e}")
+                contract_address = tx_receipt.contractAddress
+                self.contract = self.w3.eth.contract(address=contract_address, abi=abi)
+                
+                # Overwrite the old address with the new one
+                with open(CONTRACT_ADDRESS_FILE, 'w') as f:
+                    f.write(contract_address)
+                    
+                print(f"✅ New Contract Deployed at: {contract_address}")
+                self.add_log("SYSTEM", "CONTRACT_DEPLOY", "SUCCESS", "127.0.0.1")
+                
+            except Exception as e:
+                print(f"❌ Deployment Failed: {e}")
 
     def compile_contract_abi(self):
         abi, _ = self.compile_contract_full()
@@ -74,33 +83,22 @@ class EthLedger:
 
     def compile_contract_full(self):
         try:
-            with open(SOLIDITY_SOURCE_FILE, 'r') as f:
-                source = f.read()
-            
+            with open(SOLIDITY_SOURCE_FILE, 'r') as f: source = f.read()
             target_version = '0.8.0'
-            installed_versions = [str(v) for v in get_installed_solc_versions()]
-            if target_version not in installed_versions:
-                install_solc(target_version)
-            
-            compiled_sol = compile_source(
-                source, output_values=['abi', 'bin'], solc_version=target_version
-            )
+            try: get_installed_solc_versions()
+            except: install_solc(target_version)
+            compiled_sol = compile_source(source, output_values=['abi', 'bin'], solc_version=target_version)
             contract_id, contract_interface = next(iter(compiled_sol.items()))
             return contract_interface['abi'], contract_interface['bin']
-        except Exception as e:
-            print(f"❌ Solc Error: {e}")
-            return None, None
+        except: return None, None
 
-    # --- PUBLIC METHODS ---
+    # --- CORE METHODS ---
 
     def register_user(self, user_id, encoding):
         if not self.contract: return False
         try:
-            # Convert float array to int array for solidity
             encoding_int = [int(val * 1000000) for val in encoding]
-            tx_hash = self.contract.functions.registerUser(
-                str(user_id), encoding_int
-            ).transact({'from': self.account})
+            tx_hash = self.contract.functions.registerUser(str(user_id), encoding_int).transact({'from': self.account, 'gas': 3000000}) 
             self.w3.eth.wait_for_transaction_receipt(tx_hash)
             return True
         except Exception as e:
@@ -108,35 +106,24 @@ class EthLedger:
             return False
 
     def verify_user(self, user_id, encoding):
-        
         self.add_log(user_id, "FACE_VERIFY", "MATCH_FOUND", "127.0.0.1")
 
     def add_log(self, user_id, action, status, ip):
-        if not self.contract: return
-        try:
-            self.contract.functions.addAuditLog(
-                str(user_id), action, status, ip, int(time.time())
-            ).transact({'from': self.account})
-            print(f"📝 Log Added: {action} - {status}")
-        except Exception as e: 
-            print(f"⚠️ Logging Failed: {e}")
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.local_logs.insert(0, {
+            "user_id": user_id, "action": action, "status": status, "ip": ip, "timestamp": timestamp
+        })
+
+        if self.contract:
+            try:
+                tx_hash = self.contract.functions.addAuditLog(
+                    str(user_id), action, status, ip, int(time.time())
+                ).transact({'from': self.account, 'gas': 3000000}) 
+                print(f"📝 Log Saved to Chain: {action} - {status}")
+            except Exception as e: 
+                print(f"⚠️ Chain Write Error: {e}")
 
     def get_logs(self):
-        if not self.contract: return []
-        try:
-            logs = self.contract.functions.getAuditLogs().call()
-            formatted = []
-            for l in reversed(logs):
-                formatted.append({
-                    "user_id": l[0],
-                    "action": l[1],
-                    "status": l[2],
-                    "ip": l[3],
-                    "timestamp": datetime.fromtimestamp(int(l[4])).strftime('%H:%M:%S')
-                })
-            return formatted
-        except Exception as e:
-            print(f"⚠️ Fetch Logs Error: {e}")
-            return []
+        return self.local_logs
 
 eth_ledger = EthLedger()
