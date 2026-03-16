@@ -136,15 +136,13 @@
         "roll_no": "1",
         "exam_subjects": [
             "Blockchain",
-            "AI/ML",
-            "Network Security"
+            "Network Security",
+            "AI/ML"
         ],
         "mfa_enabled": false,
         "exams_verified": [
             "Blockchain"
-        
         ],
-        "terminated_exams": [
-        ]
+        "terminated_exams": []
     }
 }

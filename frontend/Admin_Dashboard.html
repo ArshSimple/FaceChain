@@ -14,46 +14,46 @@
     <aside class="w-64 bg-slate-900 border-r border-slate-800 flex flex-col p-4">
         <h1 class="text-2xl font-bold text-white mb-8">FACE<span class="text-blue-500">CHAIN</span></h1>
         <nav class="space-y-2 mb-auto">
-            <div class="px-4 py-2 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20 text-xs font-bold">DASHBOARD</div>
-            <a href="/" class="block px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded text-xs font-bold transition">👁️ STUDENT VIEW</a>
+            <div class="px-4 py-2 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20 text-xs font-bold tracking-widest">DASHBOARD</div>
+            <a href="/" class="block px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded text-xs font-bold transition tracking-widest">👁️ STUDENT VIEW</a>
         </nav>
-        <button onclick="logout()" class="w-full py-2 bg-red-900/20 text-red-400 border border-red-900/30 rounded text-xs font-bold hover:bg-red-900/40">LOGOUT</button>
+        <button onclick="logout()" class="w-full py-2 bg-red-900/20 text-red-400 border border-red-900/30 rounded text-xs font-bold hover:bg-red-900/40 transition">LOGOUT</button>
     </aside>
 
     <main class="flex-1 flex flex-col relative">
-        <header class="h-16 border-b border-slate-800 flex items-center justify-between px-8 bg-slate-900">
-            <div class="text-xs font-bold text-emerald-500">● SYSTEM ONLINE</div>
-            <button onclick="loadData()" class="text-xs bg-slate-800 text-white px-3 py-1 rounded border border-slate-600 hover:bg-slate-700">FORCE REFRESH</button>
+        <header class="h-16 border-b border-slate-800 flex items-center justify-between px-8 bg-slate-900 shadow-sm">
+            <div class="text-xs font-bold text-emerald-500 tracking-widest animate-pulse">● SYSTEM ONLINE</div>
+            <button onclick="loadData()" class="text-xs bg-slate-800 text-white px-3 py-1 rounded border border-slate-600 hover:bg-slate-700 transition">FORCE REFRESH</button>
         </header>
 
         <div class="flex-1 overflow-y-auto p-8 space-y-6">
             
-            <div class="glass p-6 rounded">
-                <h3 class="font-bold text-white mb-4">📅 Scheduler</h3>
+            <div class="glass p-6 rounded shadow-lg">
+                <h3 class="font-bold text-white mb-4 text-lg">📅 Scheduler</h3>
                 <div class="flex gap-4 mb-4">
-                    <select id="sched-subject" class="bg-slate-950 border border-slate-700 text-white p-2 rounded w-1/3 text-xs">
+                    <select id="sched-subject" class="bg-slate-950 border border-slate-700 text-white p-2 rounded w-1/3 text-xs focus:border-blue-500 focus:outline-none">
                         <option>Network Security</option><option>Blockchain</option><option>AI/ML</option>
                     </select>
-                    <input type="date" id="sched-date" class="bg-slate-950 border border-slate-700 text-white p-2 rounded w-1/3 text-xs">
-                    <button onclick="setSchedule()" class="bg-blue-600 text-white px-6 rounded font-bold text-xs">Set Schedule</button>
+                    <input type="date" id="sched-date" class="bg-slate-950 border border-slate-700 text-white p-2 rounded w-1/3 text-xs focus:border-blue-500 focus:outline-none">
+                    <button onclick="setSchedule()" class="bg-blue-600 hover:bg-blue-500 transition text-white px-6 rounded font-bold text-xs shadow">Set Schedule</button>
                 </div>
                 <div id="schedule-list" class="space-y-2"></div>
             </div>
 
-            <div class="glass p-6 rounded h-[500px] flex flex-col">
-                <div class="flex justify-between mb-4">
-                    <h3 class="font-bold text-white">🎓 Students Registry</h3>
-                    <input type="text" id="userSearch" onkeyup="filterUsers()" placeholder="Search Name/Roll..." class="bg-slate-950 border border-slate-700 text-white px-2 rounded text-xs w-64">
+            <div class="glass p-6 rounded h-[500px] flex flex-col shadow-lg">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-white text-lg">🎓 Students & Admins Registry</h3>
+                    <input type="text" id="userSearch" onkeyup="filterUsers()" placeholder="Search Name/Roll..." class="bg-slate-950 border border-slate-700 text-white px-3 py-1.5 rounded text-xs w-64 focus:border-blue-500 focus:outline-none transition">
                 </div>
-                <div class="overflow-y-auto">
+                <div class="overflow-y-auto border border-slate-800 rounded">
                     <table class="w-full text-left text-sm">
-                        <thead class="bg-slate-900 text-slate-500 text-xs uppercase sticky top-0">
+                        <thead class="bg-slate-900 text-slate-500 text-xs uppercase sticky top-0 border-b border-slate-800">
                             <tr>
-                                <th class="p-3">Name</th>
-                                <th class="p-3">Roll No</th>
-                                <th class="p-3">Exam Status / Manage</th>
-                                <th class="p-3">MFA Control</th> 
-                                <th class="p-3 text-right">Action</th>
+                                <th class="p-3 font-bold tracking-wider">Name</th>
+                                <th class="p-3 font-bold tracking-wider">Roll No</th>
+                                <th class="p-3 font-bold tracking-wider">Exam Status / Manage</th>
+                                <th class="p-3 font-bold tracking-wider">MFA Control</th> 
+                                <th class="p-3 font-bold tracking-wider text-right">Action</th>
                             </tr>
                         </thead>
                         <tbody id="userTableBody" class="divide-y divide-slate-800"></tbody>
@@ -61,25 +61,25 @@
                 </div>
             </div>
             
-            <div class="glass p-6 rounded">
-                <h3 class="font-bold text-white mb-2">🛡️ Security Logs (Blockchain)</h3>
-                <div id="logs-container" class="bg-black h-48 overflow-y-auto p-4 text-xs font-mono text-slate-500">
-                    <div class="text-center mt-10">Waiting for Data...</div>
+            <div class="glass p-6 rounded shadow-lg">
+                <h3 class="font-bold text-white mb-2 text-lg">🛡️ Security Logs (Blockchain)</h3>
+                <div id="logs-container" class="bg-black h-48 overflow-y-auto p-4 text-xs font-mono text-slate-500 rounded border border-slate-800 shadow-inner">
+                    <div class="text-center mt-10 animate-pulse">Waiting for Data...</div>
                 </div>
             </div>
         </div>
 
         <div id="examModal" class="hidden absolute inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm">
             <div class="glass p-6 rounded border border-slate-700 w-80 shadow-2xl">
-                <h3 class="text-white font-bold mb-4 text-center">Add Subject to Student</h3>
+                <h3 class="text-white font-bold mb-4 text-center text-lg">Add Subject to User</h3>
                 <select id="modal-subject" class="w-full bg-slate-950 border border-slate-700 text-white p-2 rounded text-xs mb-6 focus:outline-none focus:border-blue-500">
                     <option value="Network Security">Network Security</option>
                     <option value="Blockchain">Blockchain</option>
                     <option value="AI/ML">AI/ML</option>
                 </select>
                 <div class="flex justify-between gap-2">
-                    <button onclick="closeModal()" class="w-1/2 px-4 py-2 bg-slate-800 text-slate-300 rounded text-xs font-bold hover:bg-slate-700">Cancel</button>
-                    <button onclick="submitNewExam()" class="w-1/2 px-4 py-2 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-500">Add Exam</button>
+                    <button onclick="closeModal()" class="w-1/2 px-4 py-2 bg-slate-800 text-slate-300 rounded text-xs font-bold hover:bg-slate-700 transition">Cancel</button>
+                    <button onclick="submitNewExam()" class="w-1/2 px-4 py-2 bg-blue-600 text-white rounded text-xs font-bold hover:bg-blue-500 transition shadow">Add Exam</button>
                 </div>
             </div>
         </div>
@@ -88,7 +88,7 @@
 
     <script>
         let allUsers = [];
-        let activeUserId = null; // Stores the user ID when the modal is open
+        let activeUserId = null; 
 
         async function loadData() {
             try {
@@ -107,12 +107,15 @@
         function renderUsers(users) {
             const tbody = document.getElementById('userTableBody');
             if(!users || users.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-slate-500">No users found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-500 font-bold tracking-widest">NO USERS FOUND</td></tr>';
                 return;
             }
 
             tbody.innerHTML = users.map(u => {
-                let status = u.exam_subjects.map(s => {
+                let isAdmin = u.role === 'admin' || u.id === '1'; 
+                
+                // Allow BOTH admins and students to have exams added/managed
+                let statusHtml = u.exam_subjects.map(s => {
                     let isTerminated = u.terminated_exams && u.terminated_exams.includes(s);
                     let isVerified = u.exams_verified && u.exams_verified.includes(s);
                     let color = "bg-slate-800 text-slate-500 border-slate-700";
@@ -121,20 +124,27 @@
                     if (isTerminated) { color = "bg-red-900/30 text-red-400 border-red-900/50"; icon = "❌"; title = "Terminated"; } 
                     else if (isVerified) { color = "bg-blue-500/10 text-blue-400 border-blue-500/30"; icon = "✓"; title = "Verified"; }
                     
-                    return `<button onclick="manageExam('${u.id}', '${s}', 'remove')" class="px-2 py-1 text-[10px] border rounded mr-1 ${color} hover:bg-red-900 hover:text-white" title="${title}">${s} ${icon}</button>`;
+                    return `<button onclick="manageExam('${u.id}', '${s}', 'remove')" class="px-2 py-1 text-[10px] border rounded mr-1 ${color} hover:bg-red-900 hover:text-white transition" title="${title}">${s} ${icon}</button>`;
                 }).join('');
 
-                // Changed promptAddExam to trigger our custom modal
-                let addBtn = `<button onclick="promptAddExam('${u.id}')" class="px-2 py-1 text-[10px] border border-slate-600 rounded bg-slate-800 hover:bg-blue-600 text-slate-400 hover:text-white">+ Add</button>`;
+                let addBtn = `<button onclick="promptAddExam('${u.id}')" class="px-2 py-1 text-[10px] font-bold border border-slate-600 rounded bg-slate-800 hover:bg-blue-600 text-slate-400 hover:text-white transition">+ ADD</button>`;
                 let mfaClass = u.mfa_enabled ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" : "bg-slate-700 text-slate-400 border-slate-600";
                 
+                // Create a cool Admin Badge next to the name
+                let nameDisplay = isAdmin ? `${u.name} <span class="ml-2 px-2 py-0.5 bg-blue-900/50 text-blue-400 text-[10px] font-bold rounded border border-blue-800 align-middle">ADMIN</span>` : u.name;
+
                 return `
-                <tr class="hover:bg-slate-800/50">
-                    <td class="p-3 font-bold text-white">${u.name}</td>
+                <tr class="hover:bg-slate-800/50 transition">
+                    <td class="p-3 font-bold text-white whitespace-nowrap">${nameDisplay}</td>
                     <td class="p-3 font-mono text-blue-400">${u.roll_no}</td>
-                    <td class="p-3">${status} ${addBtn}</td>
-                    <td class="p-3"><button onclick="toggleMFA('${u.id}')" class="text-[10px] font-bold px-2 py-1 rounded border ${mfaClass}">${u.mfa_enabled ? "ENABLED" : "DISABLED"}</button></td>
-                    <td class="p-3 text-right">${u.id!=='1' ? `<button onclick="deleteUser('${u.id}')" class="text-xs text-red-400 bg-red-900/20 px-2 py-1 rounded hover:bg-red-900/40 border border-red-900/30">DELETE</button>` : '<span class="text-xs text-slate-600">Admin</span>'}</td>
+                    <td class="p-3 flex items-center gap-2">${statusHtml} ${addBtn}</td>
+                    <td class="p-3"><button onclick="toggleMFA('${u.id}')" class="text-[10px] font-bold px-2 py-1 rounded border ${mfaClass} hover:opacity-80 transition">${u.mfa_enabled ? "ENABLED" : "DISABLED"}</button></td>
+                    <td class="p-3 text-right">
+                        ${isAdmin 
+                            ? '<span class="text-xs text-slate-600 font-bold tracking-widest border border-slate-700 px-2 py-1 rounded bg-slate-800/50">PROTECTED</span>' 
+                            : `<button onclick="deleteUser('${u.id}')" class="text-[10px] font-bold tracking-wider text-red-400 bg-red-900/20 px-3 py-1.5 rounded hover:bg-red-900/50 border border-red-900/30 transition shadow">DELETE</button>`
+                        }
+                    </td>
                 </tr>`;
             }).join('');
         }
@@ -143,10 +153,10 @@
             let html = "";
             for(let [s,d] of Object.entries(sched)) {
                 html += `
-                <div class="flex justify-between items-center bg-slate-900 p-2 rounded border border-slate-800 hover:border-slate-600 transition">
+                <div class="flex justify-between items-center bg-slate-900 p-3 rounded border border-slate-800 hover:border-slate-600 transition shadow-sm">
                     <span class="text-white text-sm font-bold flex-1">${s}</span>
-                    <input type="date" value="${d}" onchange="updateSchedule('${s}', this.value)" class="bg-transparent text-emerald-400 font-mono text-xs cursor-pointer focus:outline-none border-b border-transparent hover:border-emerald-500 px-2">
-                    <button onclick="delSchedule('${s}')" class="text-red-500 text-xs hover:text-white hover:bg-red-900/50 px-2 py-1 rounded ml-2">❌</button>
+                    <input type="date" value="${d}" onchange="updateSchedule('${s}', this.value)" class="bg-transparent text-emerald-400 font-mono text-xs cursor-pointer focus:outline-none border-b border-transparent hover:border-emerald-500 px-2 transition">
+                    <button onclick="delSchedule('${s}')" class="text-red-500 text-xs hover:text-white hover:bg-red-900/50 px-2 py-1 rounded ml-2 transition">❌</button>
                 </div>`;
             }
             document.getElementById('schedule-list').innerHTML = html;
@@ -155,19 +165,18 @@
         function renderLogs(logs) {
             const container = document.getElementById('logs-container');
             if(!logs || logs.length === 0) {
-                container.innerHTML = '<div class="text-center mt-4 text-slate-600">No logs found yet.</div>';
+                container.innerHTML = '<div class="text-center mt-4 text-slate-600 font-bold tracking-widest">NO LOGS FOUND YET</div>';
                 return;
             }
             container.innerHTML = logs.map(l => 
-                `<div class="mb-1 border-b border-slate-900 pb-1 font-mono hover:bg-slate-900/50">
+                `<div class="mb-1 border-b border-slate-900 pb-1 font-mono hover:bg-slate-900/80 transition px-2 rounded">
                     <span class="text-slate-600">[${l.timestamp}]</span> 
-                    <span class="${(l.status.includes('SUCCESS') || l.status.includes('MATCH')) ? 'text-emerald-400' : 'text-red-400'}">${l.action} : ${l.status}</span> 
-                    <span class="text-slate-500">(${l.user_id})</span>
+                    <span class="${(l.status.includes('SUCCESS') || l.status.includes('MATCH')) ? 'text-emerald-400' : 'text-red-400'} font-bold">${l.action} : ${l.status}</span> 
+                    <span class="text-slate-500 text-[10px]">(${l.user_id})</span>
                 </div>`
             ).join('');
         }
 
-        // --- NEW MODAL LOGIC ---
         function promptAddExam(uid) { 
             activeUserId = uid; 
             document.getElementById('examModal').classList.remove('hidden'); 
@@ -186,7 +195,6 @@
             }
         }
 
-        // --- API ACTIONS ---
         async function manageExam(uid, sub, action) { if(action === 'add' || confirm(`Remove exam '${sub}' from user?`)) { await fetch('/admin/manage_user_exams', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({user_id: uid, subject: sub, action: action}) }); loadData(); } }
         async function setSchedule() { let s = document.getElementById('sched-subject').value; let d = document.getElementById('sched-date').value; if(d) updateSchedule(s, d); }
         async function updateSchedule(s, d) { await fetch('/admin/set_schedule', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({subject:s, date:d})}); loadData(); }
@@ -197,7 +205,7 @@
         async function logout() { await fetch('/logout'); window.location.href="index.html"; }
         
         loadData();
-        setInterval(loadData, 5000); // Auto-Refresh every 5 seconds
+        setInterval(loadData, 5000); 
     </script>
 </body>
 </html>
