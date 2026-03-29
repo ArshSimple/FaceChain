@@ -1,8 +1,3 @@
-Here is a complete, highly professional `README.md` file customized specifically for your **FaceChain** project. It is formatted using standard Markdown, which will look fantastic on GitHub and serve as excellent documentation for your examiners.
-
-You can copy and paste this directly into your `README.md` file:
-
-````markdown
 # 🛡️ FaceChain: Blockchain-Based AI Authentication System
 
 ![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)
