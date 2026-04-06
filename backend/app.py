@@ -85,7 +85,15 @@ def register():
         if uid in USER_DB: return json_resp(False, msg="User ID Exists", code=400)
         
         encoding = face_utils.get_face_embedding(face_utils.decode_image(img))
-        if encoding is None: return json_resp(False, msg="No Face Detected", code=400)
+        
+        # --- NEW TAILGATING LOGIC (Registration) ---
+        if isinstance(encoding, str):
+            if encoding == "NO_FACE":
+                return json_resp(False, msg="No Face Detected. Please align your face.", code=400)
+            elif encoding == "MULTIPLE_FACES":
+                return json_resp(False, msg="Multiple faces detected! Only you should be in the frame.", code=400)
+        elif encoding is None:
+            return json_resp(False, msg="Could not process image.", code=400)
 
         mfa_secret = pyotp.random_base32()
         USER_DB[uid] = {
@@ -124,7 +132,16 @@ def login():
         return json_resp(False, msg="Image Decode Failed", code=400)
     
     encoding = face_utils.get_face_embedding(decoded_frame)
-    if encoding is None: return json_resp(False, msg="No Face Visible", code=200)
+    
+    # --- NEW TAILGATING LOGIC (Login) ---
+    if isinstance(encoding, str):
+        if encoding == "NO_FACE":
+            return json_resp(False, msg="No Face Visible", code=200)
+        elif encoding == "MULTIPLE_FACES":
+            ledger.add_log(uid, "LOGIN_ATTEMPT", "MULTIPLE_FACES", request.remote_addr)
+            return json_resp(False, msg="SECURITY ALERT: Multiple faces in camera!", code=200)
+    elif encoding is None:
+        return json_resp(False, msg="Could not process image.", code=200)
     
     match_id, _ = face_utils.find_match(encoding)
     if match_id == uid:
@@ -163,7 +180,6 @@ def monitor_exam():
     uid = session.get('user_id')
     img_data = request.json.get('image')
     
-    # --- NEW: Check if the frontend wants us to log this specific check ---
     log_warning = request.json.get('log_warning', True) 
     
     if request.json.get('terminate'):
@@ -186,10 +202,16 @@ def monitor_exam():
         current_encoding = face_utils.get_face_embedding(current_frame)
     except: return json_resp(False, msg="Frame Error")
 
-    if current_encoding is None:
-        # --- NEW: Only log to blockchain if log_warning is True ---
-        if log_warning: ledger.add_log(uid, "MONITORING", "FACE_MISSING", request.remote_addr)
-        return json_resp(False, msg="⚠️ Warning: No face detected!")
+    # --- NEW TAILGATING LOGIC (Proctoring Engine) ---
+    if isinstance(current_encoding, str):
+        if current_encoding == "NO_FACE":
+            if log_warning: ledger.add_log(uid, "MONITORING", "FACE_MISSING", request.remote_addr)
+            return json_resp(False, msg="⚠️ Warning: No face detected!")
+        elif current_encoding == "MULTIPLE_FACES":
+            if log_warning: ledger.add_log(uid, "MONITORING", "MULTIPLE_FACES", request.remote_addr)
+            return json_resp(False, msg="⚠️ PROCTORING ALERT: Multiple faces in camera!")
+    elif current_encoding is None:
+        return json_resp(False, msg="Could not process image.")
 
     stored_data = USER_DB.get(uid)
     if not stored_data or not stored_data['encoding']: return json_resp(False, msg="User Data Error")
@@ -197,7 +219,6 @@ def monitor_exam():
     if face_utils.face_recognition.compare_faces([stored_data['encoding']], current_encoding, tolerance=0.5)[0]:
         return json_resp(True, msg="Verified")
     else:
-        # --- NEW: Only log to blockchain if log_warning is True ---
         if log_warning: ledger.add_log(uid, "MONITORING", "FRAUD_DETECTED", request.remote_addr)
         return json_resp(False, msg="⚠️ ALARM: Wrong Person!")
 

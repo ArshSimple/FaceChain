@@ -162,19 +162,30 @@
             document.getElementById('schedule-list').innerHTML = html;
         }
 
+        // FIXED RENDER LOGS FUNCTION
         function renderLogs(logs) {
             const container = document.getElementById('logs-container');
             if(!logs || logs.length === 0) {
                 container.innerHTML = '<div class="text-center mt-4 text-slate-600 font-bold tracking-widest">NO LOGS FOUND YET</div>';
                 return;
             }
-            container.innerHTML = logs.map(l => 
-                `<div class="mb-1 border-b border-slate-900 pb-1 font-mono hover:bg-slate-900/80 transition px-2 rounded">
+            container.innerHTML = logs.map(l => {
+                let colorClass = "text-emerald-400"; // Default green
+                let statusUpper = l.status.toUpperCase();
+                
+                // Strictly catch errors so they don't get confused by the word "MATCH"
+                if (statusUpper === "FACE_MISMATCH" || statusUpper === "FAILED" || statusUpper === "USER_NOT_FOUND" || statusUpper === "MULTIPLE_FACES" || statusUpper.includes("ERROR") || statusUpper.includes("FRAUD_DETECTED") || statusUpper.includes("FACE_MISSING")) {
+                    colorClass = "text-red-500";
+                } else if (statusUpper === "WARNING") {
+                    colorClass = "text-yellow-500";
+                }
+
+                return `<div class="mb-1 border-b border-slate-900 pb-1 font-mono hover:bg-slate-900/80 transition px-2 rounded">
                     <span class="text-slate-600">[${l.timestamp}]</span> 
-                    <span class="${(l.status.includes('SUCCESS') || l.status.includes('MATCH')) ? 'text-emerald-400' : 'text-red-400'} font-bold">${l.action} : ${l.status}</span> 
+                    <span class="${colorClass} font-bold">${l.action} : ${l.status}</span> 
                     <span class="text-slate-500 text-[10px]">(${l.user_id})</span>
-                </div>`
-            ).join('');
+                </div>`;
+            }).join('');
         }
 
         function promptAddExam(uid) { 

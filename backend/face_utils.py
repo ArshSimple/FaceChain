@@ -64,10 +64,12 @@ def decode_image(base64_string):
 def get_face_embedding(image):
     # Detect faces
     faces = detector(image, 1)
-    if len(faces) != 1:
-        return None  # Ensure exactly one face
     
-    # Get shape and encoding
+    if len(faces) == 0:
+        return "NO_FACE"
+    if len(faces) > 1:
+        return "MULTIPLE_FACES"  
+    
     shape = predictor(image, faces[0])
     face_descriptor = face_rec_model.compute_face_descriptor(image, shape)
     return np.array(face_descriptor)
