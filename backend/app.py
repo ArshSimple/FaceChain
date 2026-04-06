@@ -174,6 +174,7 @@ def verify_mfa():
 # 4. EXAM & MONITORING ROUTES
 # ==========================================
 @app.route('/monitor_exam', methods=['POST'])
+@limiter.exempt
 def monitor_exam():
     if not session.get('logged_in'): return json_resp(False, msg="Session Expired", code=401)
     

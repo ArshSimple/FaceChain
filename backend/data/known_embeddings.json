@@ -140,7 +140,8 @@
         ],
         "mfa_enabled": false,
         "exams_verified": [
-            "Blockchain"
+            "Blockchain",
+            "AI/ML"
         ],
         "terminated_exams": []
     },
@@ -280,7 +281,8 @@
         "name": "Kaizad Bhaurcha",
         "roll_no": "4",
         "exam_subjects": [
-            "AI/ML"
+            "AI/ML",
+            "Network Security"
         ],
         "mfa_enabled": true,
         "exams_verified": [
