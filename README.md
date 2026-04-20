@@ -123,8 +123,7 @@ FaceChain/
 
 ## 👥 Authors
 
-  * **Arsh Agrawal** - *Core Backend, Blockchain Integration & AI*
-  * **Kaizad Bharucha** - *Frontend Development & UI/UX*
+  * **Arsh Agrawal** - *Full-Stack Developer*
 
 **Under the esteemed guidance of:** Mr. Sadiq Batliwala  
 **Department:** B.Voc. Web Technology, K.C. College, Mumbai

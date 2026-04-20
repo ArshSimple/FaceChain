@@ -638,7 +638,7 @@
                 if (d.match) {
                     stopAllCameras();
 
-                    // FIXED: MFA check is here!
+                    // MFA check is here!
                     if (d.mfa_required) {
                         let code = prompt("Enter your 6-Digit Google Authenticator Code:");
                         if (code) verifyMFA(roll, code);

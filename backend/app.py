@@ -29,7 +29,6 @@ limiter = Limiter(get_remote_address, app=app, default_limits=["200 per day", "5
 print("🚀 Loading Database...")
 USER_DB = face_utils.load_embeddings()
 
-# Auto-Create Admin (User ID 1)
 if "1" not in USER_DB:
     print("⚠️ Creating Default Admin (ID: 1)...")
     USER_DB["1"] = {
@@ -86,7 +85,7 @@ def register():
         
         encoding = face_utils.get_face_embedding(face_utils.decode_image(img))
         
-        # --- NEW TAILGATING LOGIC (Registration) ---
+        # --- TAILGATING LOGIC (Registration) ---
         if isinstance(encoding, str):
             if encoding == "NO_FACE":
                 return json_resp(False, msg="No Face Detected. Please align your face.", code=400)
@@ -133,7 +132,7 @@ def login():
     
     encoding = face_utils.get_face_embedding(decoded_frame)
     
-    # --- NEW TAILGATING LOGIC (Login) ---
+    # --- TAILGATING LOGIC (Login) ---
     if isinstance(encoding, str):
         if encoding == "NO_FACE":
             return json_resp(False, msg="No Face Visible", code=200)
@@ -203,7 +202,7 @@ def monitor_exam():
         current_encoding = face_utils.get_face_embedding(current_frame)
     except: return json_resp(False, msg="Frame Error")
 
-    # --- NEW TAILGATING LOGIC (Proctoring Engine) ---
+    # --- TAILGATING LOGIC (Proctoring Engine) ---
     if isinstance(current_encoding, str):
         if current_encoding == "NO_FACE":
             if log_warning: ledger.add_log(uid, "MONITORING", "FACE_MISSING", request.remote_addr)
